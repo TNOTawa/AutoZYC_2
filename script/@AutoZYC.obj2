@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- AutoZYC v2.0 - 核心基础设施
 -- 所有section通过全局 AutoZYC_State 表通信
 -- 无共享preamble可执行代码 - 每section完全自包含
@@ -108,6 +108,84 @@ function State.load_from_mod2(mod, event_type)
         end
     end
 end
+-- ============================================================
+-- 缓动函数库 (Ease table)
+-- 从 AutoZYC.tra2 前导迁移至此，确保全局可用
+-- ============================================================
+Ease = {}
+
+-- 1. 线性
+function Ease.linear(t) return t end
+
+-- 2. 缓入二次
+function Ease.easeInQuad(t) return t * t end
+
+-- 3. 缓出二次
+function Ease.easeOutQuad(t) return 1 - (1 - t) * (1 - t) end
+
+-- 4. 缓入缓出二次
+function Ease.easeInOutQuad(t)
+    if t < 0.5 then return 2 * t * t
+    else return 1 - 2 * (1 - t) * (1 - t) end
+end
+
+-- 5. 缓入三次
+function Ease.easeInCubic(t) return t * t * t end
+
+-- 6. 缓出三次
+function Ease.easeOutCubic(t) return 1 - (1 - t) ^ 3 end
+
+-- 7. 缓入缓出三次
+function Ease.easeInOutCubic(t)
+    if t < 0.5 then return 4 * t * t * t
+    else return 1 - (-2 * t + 2) ^ 3 / 2 end
+end
+
+-- 8. 缓出弹跳
+function Ease.easeOutBounce(t)
+    local n1 = 7.5625
+    local d1 = 2.75
+    if t < 1 / d1 then
+        return n1 * t * t
+    elseif t < 2 / d1 then
+        t = t - 1.5 / d1
+        return n1 * t * t + 0.75
+    elseif t < 2.5 / d1 then
+        t = t - 2.25 / d1
+        return n1 * t * t + 0.9375
+    else
+        t = t - 2.625 / d1
+        return n1 * t * t + 0.984375
+    end
+end
+
+-- 9. 缓出回退
+function Ease.easeOutBack(t)
+    local c1 = 1.70158
+    local c3 = c1 + 1
+    return 1 + c3 * (t - 1) ^ 3 + c1 * (t - 1) ^ 2
+end
+
+-- 10. 缓出弹性
+function Ease.easeOutElastic(t)
+    if t == 0 or t == 1 then return t end
+    local c4 = 2 * math.pi / 3
+    return 2 ^ (-10 * t) * math.sin((t * 10 - 0.75) * c4) + 1
+end
+
+-- 缓动函数选择器
+function Ease.select(acc, dec)
+    if acc and dec then
+        return Ease.easeInOutQuad
+    elseif acc then
+        return Ease.easeOutQuad
+    elseif dec then
+        return Ease.easeInQuad
+    else
+        return Ease.linear
+    end
+end
+
 
 function init()
     if not data_file or data_file == "" then return end
