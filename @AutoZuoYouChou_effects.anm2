@@ -1,0 +1,108 @@
+@常用效果
+--value@track:指定轨道,0
+--select@mirror:镜像反转,无=0,左右反转=1,上下反转=2, 顺时针=3, 逆时针=4
+--check@toggle_alpha:物件间不显示,0
+
+function get_counter_data()
+    return AutoZYC_Item_count
+end
+
+local item_count_data = get_counter_data()
+
+local track = track or 0 
+local mirror_option = mirror or 0 
+
+-- 获取指定轨道的物件数量
+local item_count = item_count_data[track] and item_count_data[track].count or 0
+
+------------------
+-- 物件间不显示 --
+------------------
+
+-- 处理复选框逻辑
+if toggle_alpha == 1 then
+    if item_count_data[track] and item_count_data[track].exists == false then
+        obj.alpha = 0.0  -- 设置不透明度为100%
+    else
+        obj.alpha = 1.0  -- 设置不透明度为0%
+    end
+else
+    obj.alpha = 1.0  -- 复选框未选中，保持不透明度为0%
+end
+
+--------------
+-- 镜像翻转 --
+--------------
+
+local zyfz = 0
+local sxfz = 0
+local zqfz = 0
+
+if mirror_option == 0 then
+    -- 关闭所有反转效果
+    obj.effect("反転", "左右反転", 0)  -- 关闭左右反转
+    obj.effect("反転", "上下反転", 0)  -- 关闭上下反转
+else
+    -- 如果镜像翻转选项不为0，检查物件数量
+    if item_count > 0 then
+        if mirror_option == 1 then
+            -- 根据物件数量的奇偶性决定是否执行左右反转
+            if item_count % 2 == 1 then  -- 奇数物件
+                if zyfz == 0 then
+                    obj.effect("反転", "左右反転", 1)  -- 启用左右反转
+                    zyfz = 1  -- 更新状态
+                else
+                    obj.effect("反転", "左右反転", 0)  -- 关闭左右反转
+                    zyfz = 0  -- 更新状态
+                end
+            else
+                obj.effect("反転", "左右反転", 0)  -- 偶数物件，不执行反转
+            end
+        elseif mirror_option == 2 then
+            -- 根据物件数量的奇偶性决定是否执行上下反转
+            if item_count % 2 == 1 then  -- 奇数物件
+                if sxfz == 0 then
+                    obj.effect("反転", "上下反転", 1)  -- 启用上下反转
+                    sxfz = 1  -- 更新状态
+                else
+                    obj.effect("反転", "上下反転", 0)  -- 关闭上下反转
+                    sxfz = 0  -- 更新状态
+                end
+            else
+                obj.effect("反転", "上下反転", 0)  -- 偶数物件，不执行反转
+            end
+		elseif mirror_option == 3 then
+            if item_count % 4 == 0 then  -- 物件1
+                obj.effect("反転", "左右反転", 0)
+                obj.effect("反転", "上下反転", 0)
+            elseif item_count % 4 == 1 then  -- 物件2
+                obj.effect("反転", "左右反転", 1)
+                obj.effect("反転", "上下反転", 0)
+            elseif item_count % 4 == 2 then  -- 物件3
+                obj.effect("反転", "左右反転", 1)
+                obj.effect("反転", "上下反転", 1)
+            elseif item_count % 4 == 3 then  -- 物件4
+                obj.effect("反転", "左右反転", 0)
+                obj.effect("反転", "上下反転", 1)
+            end
+        elseif mirror_option == 4 then
+            if item_count % 4 == 0 then  -- 物件1
+                obj.effect("反転", "左右反転", 0)
+                obj.effect("反転", "上下反転", 0)
+            elseif item_count % 4 == 1 then  -- 物件2
+                obj.effect("反転", "左右反転", 0)
+                obj.effect("反転", "上下反転", 1)
+            elseif item_count % 4 == 2 then  -- 物件3
+                obj.effect("反転", "左右反転", 1)
+                obj.effect("反転", "上下反転", 1)
+            elseif item_count % 4 == 3 then  -- 物件4
+                obj.effect("反転", "左右反転", 1)
+                obj.effect("反転", "上下反転", 0)
+            end
+        end
+    else
+        -- 如果没有物件，关闭所有反转效果
+        obj.effect("反転", "左右反転", 0)  -- 关闭左右反转
+        obj.effect("反転", "上下反転", 0)  -- 关闭上下反转
+    end
+end

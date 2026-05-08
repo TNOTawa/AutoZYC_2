@@ -1,0 +1,19 @@
+@缓动设置
+--value@easeIndex:缓动编号,1
+--value@trackIndex:指定轨道,1
+--value@duration:持续时间,1
+
+-- 全局存储结构
+if AutoZYC_EaseSettings == nil then
+    AutoZYC_EaseSettings = {}
+end
+
+-- 直接更新设置
+easeIndex = tonumber(easeIndex) or 0
+trackIndex = tonumber(trackIndex) or 1
+duration = tonumber(duration) or 1
+
+AutoZYC_EaseSettings[easeIndex] = {
+    trackIndex = trackIndex,
+    duration = duration
+}
