@@ -1,0 +1,62 @@
+[Language]
+Name=English (US)
+Author=AutoZYC
+
+[@AutoZYC.obj2]
+RPP导入=RPP Import
+MIDI导入=MIDI Import
+物件计数器=Object Counter
+物件生成器=Object Generator
+缓动设置=Ease Settings
+rpp_file=RPP File
+midi_file=MIDI File
+mode=Generation Mode
+track=Track
+easeIndex=Ease Index
+trackIndex=Target Track
+duration=Duration
+AutoZYC\RPP导入=AutoZYC\RPP Import
+AutoZYC\MIDI导入=AutoZYC\MIDI Import
+AutoZYC\物件计数器=AutoZYC\Object Counter
+AutoZYC\物件生成器=AutoZYC\Object Generator
+AutoZYC\缓动设置=AutoZYC\Ease Settings
+
+[@AutoZYC.tra2]
+线性运动=Linear Motion
+视频播放控制=Video Playback
+音高驱动位置=Pitch-Driven Position
+力度驱动透明度=Velocity-Driven Alpha
+表达式映射=Expression Mapping
+BPM同步缓动=BPM-Synced Easing
+expression=Ease Expression
+bpm=BPM Value
+minAlpha=Minimum Alpha
+accelerate=Accelerate
+decelerate=Decelerate
+param=Ease Index
+AutoZYC\线性运动=AutoZYC\Linear Motion
+AutoZYC\视频播放控制=AutoZYC\Video Playback
+AutoZYC\音高驱动位置=AutoZYC\Pitch-Driven Position
+AutoZYC\力度驱动透明度=AutoZYC\Velocity-Driven Alpha
+AutoZYC\表达式映射=AutoZYC\Expression Mapping
+AutoZYC\BPM同步缓动=AutoZYC\BPM-Synced Easing
+
+[@AutoZYC.anm2]
+常用效果=Common Effects
+色相映射=Hue Mapping (Pitch→Hue)
+亮度映射=Brightness (Velocity→Brightness)
+mirror=Mirror Flip
+toggle_alpha=Hide Between Objects
+track=Target Track
+AutoZYC\常用效果=AutoZYC\Common Effects
+AutoZYC\色相映射=AutoZYC\Hue Mapping
+AutoZYC\亮度映射=AutoZYC\Brightness Mapping
+
+[共通]
+无=None
+左右反转=Left-Right Flip
+上下反转=Top-Bottom Flip
+顺时针=Clockwise
+逆时针=Counter-Clockwise
+手动=Manual
+自动=Auto

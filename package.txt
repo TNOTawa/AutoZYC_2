@@ -1,0 +1,15 @@
+AutoZYC v2.0 Installation
+==========================
+1. Drag AutoZYC-v2.0.0.au2pkg.zip onto the Aviutl2 window
+   OR
+2. Extract manually to Aviutl2 installation directory:
+   Script/AutoZYC/@AutoZYC.obj2
+   Script/AutoZYC/@AutoZYC.tra2
+   Script/AutoZYC/@AutoZYC.anm2
+   Language/Chinese.AutoZYC.aul2
+   Language/English.AutoZYC.aul2
+
+Requirements:
+- Aviutl2 beta43b+ (build 2004300+)
+- For RPP files: REAPER project files
+- For MIDI files: Standard MIDI Files (SMF) format 0 or 1
