@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- AutoZYC v2.0 - 统一缓动函数库
 -- ============================================================
 
@@ -269,53 +269,19 @@ local ease = Ease.select(acc, dec)
 local counter_data = AutoZYC_Item_count or {}
 local track_data = counter_data[trackIndex]
 
--- Build sandbox environment (only math functions + MIDI data variables)
-local sandbox = {
-    -- math functions
-    abs = math.abs, floor = math.floor, ceil = math.ceil,
-    sin = math.sin, cos = math.cos, tan = math.tan,
-    asin = math.asin, acos = math.acos, atan = math.atan,
-    atan2 = math.atan2,
-    sqrt = math.sqrt, pow = math.pow, exp = math.exp, log = math.log,
-    min = math.min, max = math.max, modf = math.modf,
-    pi = math.pi,
+local pitch = track_data and track_data.pitch_shift or 0
+local velocity = track_data and track_data.velocity or 100
+local time = AutoZYC_GlobalAudioTime or 0
+local idx = track_data and track_data.count or 0
 
-    -- data variables
-    pitch = track_data and track_data.pitch_shift or 0,
-    velocity = track_data and track_data.velocity or 100,
-    time = AutoZYC_GlobalAudioTime or 0,
-    item_idx = track_data and track_data.count or 0,
-    track = trackIndex,
-}
-
--- Expression cache (file-level local)
-if not AutoZYC_ExprCache then AutoZYC_ExprCache = {} end
-local cache_key = expression or ""
-
-local fn
-if AutoZYC_ExprCache[cache_key] then
-    fn = AutoZYC_ExprCache[cache_key]  -- cache hit
-else
-    -- Compile: load("return "..expr, "=expr", "t", sandbox)
-    local ok, result = load("return " .. cache_key, "=expr", "t", sandbox)
-    if ok then
-        AutoZYC_ExprCache[cache_key] = result
-        fn = result
-    else
-        debug_print("[表达式映射] 编译错误: " .. tostring(result))
-        return s  -- compile error → return start
-    end
-end
-
--- Execute expression
-local ok, value = pcall(fn)
+local mod = obj.module("AutoZYCParse")
+local ok, result = pcall(mod.eval_expression, expression or "", pitch, velocity, time, idx, trackIndex)
 if not ok then
-    debug_print("[表达式映射] 求值错误: " .. tostring(value))
-    return s  -- runtime error → return start
+    debug_print("[表达式映射] 求值错误: " .. tostring(result))
+    return s
 end
 
--- Map expression result to [s, e]
-local t_norm = tonumber(value) or 0
+local t_norm = tonumber(result) or 0
 t_norm = math.max(0, math.min(1, t_norm))
 local t_eased = ease(t_norm)
 return s + (e - s) * t_eased
