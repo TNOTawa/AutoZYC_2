@@ -1,57 +1,34 @@
-﻿-- ============================================================
+-- ============================================================
 -- AutoZYC v2.0 - 核心基础设施
--- 共享序言: 工具函数 + 全局状态管理
+-- 所有section通过全局 AutoZYC_State 表通信
+-- 无共享preamble可执行代码 - 每section完全自包含
 -- ============================================================
 
-local obj, math, tonumber, type, ipairs, pairs, table, string, debug_print =
-    obj, math, tonumber, type, ipairs, pairs, table, string, debug_print;
+@数据导入
+--file@data_file:数据文件(RPP/MIDI)
+--select@file_type:文件类型,自动检测=0,RPP文件=1,MIDI文件=2
+--require:2004300
+--label:AutoZYC\数据导入
 
--- ============================================================
--- T9: 工具函数
--- ============================================================
-
-local function clamp(val, min_val, max_val)
-    if val < min_val then return min_val end
-    if val > max_val then return max_val end
-    return val
-end
-
-local function normalize(val, min_val, max_val)
-    if max_val == min_val then return 0.5 end
-    return (val - min_val) / (max_val - min_val)
-end
-
-local function lerp(a, b, t)
-    return a + (b - a) * t
-end
-
-local function map(val, srcMin, srcMax, dstMin, dstMax)
-    return lerp(dstMin, dstMax, normalize(val, srcMin, srcMax))
-end
-
-local function safe_tonumber(val, default)
-    if type(val) == "number" then return val end
-    local n = tonumber(val)
-    if n then return n end
-    return default or 0
-end
-
-local function is_number(val)
-    return type(val) == "number"
-end
+local obj, math, tonumber, type, ipairs, pairs, table, debug_print =
+    obj, math, tonumber, type, ipairs, pairs, table, debug_print;
 
 local function sec_to_ms(s)
     return math.floor(tonumber(s) * 1000 + 0.5)
 end
 
--- ============================================================
--- T4: 全局状态管理 (唯一全局表)
--- ============================================================
-
-AutoZYC_State = {}
+AutoZYC_State = AutoZYC_State or {}
 local State = AutoZYC_State
+if not State._ready then
+    State.events = {}
+    State.track_meta = {}
+    State.play_state = {}
+    State.global_time = 0
+    State.settings = {}
+    State._ready = true
+end
 
-local function State_init()
+function State.reset()
     State.events = {}
     State.track_meta = {}
     State.play_state = {}
@@ -59,14 +36,8 @@ local function State_init()
     State.settings = {}
 end
 
-function State.reset()
-    State_init()
-end
-
 function State.add_event(track, evt)
-    if not State.events[track] then
-        State.events[track] = {}
-    end
+    if not State.events[track] then State.events[track] = {} end
     table.insert(State.events[track], evt)
 end
 
@@ -77,65 +48,39 @@ end
 function State.update(time)
     State.global_time = time
     local t_ms = time * 1000
-
     for track, items in pairs(State.events) do
-        local state = State.play_state[track] or {
-            current_item = 0,
-            is_playing = false,
-            item_start_ms = 0,
-            length_ms = 0,
-            pitch = 0,
-            velocity = 0
-        }
-        state.current_item = 0
-        state.is_playing = false
-
+        local st = {current_item=0, is_playing=false}
         for idx, item in ipairs(items) do
-            local start = item.position_ms
-            local finish = start + item.length_ms
-
-            if t_ms >= start and t_ms < finish then
-                state.current_item = idx
-                state.is_playing = true
-                state.item_start_ms = start
-                state.length_ms = item.length_ms
-                state.pitch = item.pitch_shift or 0
-                state.velocity = item.velocity or 0
+            if t_ms >= item.position_ms and t_ms < (item.position_ms + item.length_ms) then
+                st.current_item = idx
+                st.is_playing = true
+                st.item_start_ms = item.position_ms
+                st.length_ms = item.length_ms
+                st.pitch = item.pitch_shift or 0
+                st.velocity = item.velocity or 0
                 break
             end
         end
-
-        State.play_state[track] = state
+        State.play_state[track] = st
     end
 end
 
 function State.get_current(track)
     local s = State.play_state[track]
-    if not s then
-        return {
-            current_item = 0,
-            is_playing = false,
-            pitch = 0,
-            velocity = 0,
-            item_start_ms = 0,
-            length_ms = 0
-        }
-    end
-    return s
+    return s or {current_item=0, is_playing=false, pitch=0, velocity=0}
 end
 
 function State.set_setting(idx, track_idx, dur)
-    State.settings[idx] = {track = track_idx, duration = dur}
+    State.settings[idx] = {track=track_idx, duration=dur}
 end
 
 function State.get_setting(idx)
     return State.settings[idx]
 end
 
--- 从 .mod2 模块加载事件数据到 State
 function State.load_from_mod2(mod, event_type)
-    local track_count = mod.get_track_count()
-    for track = 1, track_count do
+    local tc = mod.get_track_count()
+    for track = 1, tc do
         local count = mod.get_event_count(track)
         if count and count > 0 then
             local data = mod.get_event_data(track)
@@ -152,11 +97,10 @@ function State.load_from_mod2(mod, event_type)
                 })
             end
         end
-
         local meta = mod.get_track_meta(track)
         if meta then
             State.track_meta[track] = {
-                name = string.format("Track %d", track),
+                name = "Track " .. track,
                 min_pitch = meta.min_pitch or -12,
                 max_pitch = meta.max_pitch or 12,
                 item_count = meta.item_count or 0
@@ -165,110 +109,63 @@ function State.load_from_mod2(mod, event_type)
     end
 end
 
-State_init()
-
--- ============================================================
--- 数据导入 (统一 RPP/MIDI 解析)
--- ============================================================
-
-@数据导入
---file@data_file:数据文件(RPP/MIDI)
---select@file_type:文件类型,自动检测=0,RPP文件=1,MIDI文件=2
---require:2004300
---label:AutoZYC\数据导入
-
 function init()
     if not data_file or data_file == "" then return end
-
     if obj.frame == 1 or not next(State.events) then
         State.reset()
-
         local mod = obj.module("AutoZYCParse")
         local ok, err = pcall(mod.parse_file, data_file)
         if not ok then
-            debug_print("[数据导入] 解析失败: " .. tostring(err))
+            debug_print("[数据导入] 失败: " .. tostring(err))
             return
         end
-
-        -- Auto-detect type from extension (or use file_type parameter)
         local ext = data_file:lower()
         local event_type = "audio"
         if file_type == 2 or ext:match("%.mid$") or ext:match("%.midi$") or ext:match("%.smf$") then
             event_type = "midi"
         end
-
         State.load_from_mod2(mod, event_type)
-
-        -- Backward compat: AutoZYC_PitchRange
-        AutoZYC_PitchRange = AutoZYC_PitchRange or {}
+        AutoZYC_PitchRange = {}
         for track, meta in pairs(State.track_meta) do
-            AutoZYC_PitchRange[track] = {
-                minPitch = meta.min_pitch,
-                maxPitch = meta.max_pitch
-            }
+            AutoZYC_PitchRange[track] = {minPitch=meta.min_pitch, maxPitch=meta.max_pitch}
         end
-
         local total = 0
-        for _, items in pairs(State.events) do
-            total = total + #items
-        end
-        debug_print(string.format("[数据导入] 解析完成 (共 %d 个事件, 类型=%s)", total, event_type))
+        for _, items in pairs(State.events) do total = total + #items end
+        debug_print("[数据导入] 完成: " .. total .. " 事件, 类型=" .. event_type)
     end
-
     State.update(obj.time)
 end
 
 init()
-
--- ============================================================
--- 物件计数器 (T20: 轨道状态追踪)
--- ============================================================
 
 @物件计数器
 --require:2004300
 --label:AutoZYC\物件计数器
 
 local obj, math, type, ipairs, pairs = obj, math, type, ipairs, pairs;
-
--- Called every frame to update track playback state
--- Uses State.update() from preamble
-
--- Count items per track and update play_state
--- v1.1 compatible: check current_time_ms >= start AND < finish
--- Handles gap tracks (tracks 1,3,5 but not 2,4)
+local State = AutoZYC_State or {}
+if type(State.update) ~= "function" then return end
 
 State.update(obj.time)
-
--- Also update AutoZYC_Item_count for backward compatibility
--- with easing sections that read this global
-AutoZYC_Item_count = AutoZYC_Item_count or {}
+AutoZYC_Item_count = {}
 for track, items in pairs(State.events) do
-    local state = State.get_current(track)
+    local st = State.get_current(track)
     local count = 0
     local t_ms = obj.time * 1000
-
     for _, item in ipairs(items) do
-        if t_ms >= item.position_ms then
-            count = count + 1
-        end
+        if t_ms >= item.position_ms then count = count + 1 end
     end
-
     AutoZYC_Item_count[track] = {
         count = count,
-        exists = state.is_playing,
-        position_ms = state.item_start_ms or 0,
-        remaining_ms = state.is_playing and math.max(0, (state.item_start_ms or 0) + (state.length_ms or 0) - t_ms) or 0,
-        length_ms = state.length_ms or 0,
-        pitch_shift = state.pitch or 0,
-        velocity = state.velocity or 0
+        exists = st.is_playing,
+        position_ms = st.item_start_ms or 0,
+        remaining_ms = st.is_playing and math.max(0, (st.item_start_ms or 0) + (st.length_ms or 0) - t_ms) or 0,
+        length_ms = st.length_ms or 0,
+        pitch_shift = st.pitch or 0,
+        velocity = st.velocity or 0
     }
 end
-
 AutoZYC_GlobalAudioTime = obj.time
-
--- ============================================================
--- 物件生成器 (T21: 手动物件生成)
--- ============================================================
 
 @物件生成器
 --select@mode:生成模式,手动=0,自动=1
@@ -276,63 +173,27 @@ AutoZYC_GlobalAudioTime = obj.time
 --require:2004300
 --label:AutoZYC\物件生成器
 
-local obj, math, type, ipairs, pairs = obj, math, type, ipairs, pairs;
-
+local obj, math, type, ipairs = obj, math, type, ipairs;
+local State = AutoZYC_State or {}
 local track = track or 1
 local items = State.get_events(track)
-
-if #items == 0 then
-    return
-end
-
--- Calculate which item this frame aligns with
-local current_time_ms = obj.time * 1000
-local current_item = nil
-local current_idx = 0
+if #items == 0 then return end
+local t_ms = obj.time * 1000
 for idx, item in ipairs(items) do
     local start_ms = item.position_ms
-    local end_ms = start_ms + item.length_ms
-
-    if current_time_ms >= start_ms and current_time_ms < end_ms then
-        current_item = item
-        current_idx = idx
+    if t_ms >= start_ms and t_ms < (start_ms + item.length_ms) then
+        local progress = (t_ms - start_ms) / math.max(item.length_ms, 1)
+        local pitch = item.pitch_shift or 0
+        obj.ox = (obj.ox or 0) + pitch * 5
+        AutoZYC_CurrentEvent = {
+            track = track, index = idx,
+            pitch_shift = pitch, velocity = item.velocity or 100,
+            position_ms = item.position_ms, length_ms = item.length_ms,
+            progress = math.max(0, math.min(1, progress))
+        }
         break
     end
 end
-
-if current_item then
-    -- Position object at this item's time-aligned position
-    -- Map event position to object position using obj.effect()
-    local pitch = current_item.pitch_shift or 0
-    local velocity = current_item.velocity or 100
-    local progress = (current_time_ms - current_item.position_ms) / (current_item.length_ms or 1)
-
-    -- Set object x-position proportional to event timeline progress
-    -- (obj.ox, obj.oy are object position in Aviutl2 coordinate space)
-    obj.ox = obj.ox or 0
-    obj.oy = obj.oy or 0
-
-    -- Apply pitch-driven horizontal offset via obj.effect()
-    -- This makes the object respond to audio pitch like v1.1 @音高驱动位置
-    local pitch_offset = pitch * 5  -- 5 pixels per semitone
-    obj.ox = obj.ox + pitch_offset
-
-    -- Store current item info for other scripts to read
-    -- Compatible with existing @效果 and @缓动 expectations
-    AutoZYC_CurrentEvent = {
-        track = track,
-        index = current_idx,
-        pitch_shift = pitch,
-        velocity = velocity,
-        position_ms = current_item.position_ms,
-        length_ms = current_item.length_ms,
-        progress = math.max(0, math.min(1, progress))
-    }
-end
-
--- ============================================================
--- 缓动设置 (T22: 缓动设置存储)
--- ============================================================
 
 @缓动设置
 --value@easeIndex:缓动编号,1
@@ -341,18 +202,13 @@ end
 --require:2004300
 --label:AutoZYC\缓动设置
 
--- v1.1 compatible ease settings storage
--- Uses State.set_setting() from preamble
-
+local obj, tonumber = obj, tonumber;
+local State = AutoZYC_State or {}
 local ei = tonumber(easeIndex) or 1
 local ti = tonumber(trackIndex) or 1
 local du = tonumber(duration) or 1
-
-State.set_setting(ei, ti, du)
-
--- Also update AutoZYC_EaseSettings for backward compatibility
+if type(State.set_setting) == "function" then
+    State.set_setting(ei, ti, du)
+end
 AutoZYC_EaseSettings = AutoZYC_EaseSettings or {}
-AutoZYC_EaseSettings[ei] = {
-    trackIndex = ti,
-    duration = du
-}
+AutoZYC_EaseSettings[ei] = {trackIndex = ti, duration = du}

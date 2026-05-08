@@ -2,7 +2,6 @@
 -- AutoZYC v2.0 - 视觉效果与着色器
 -- ============================================================
 
-local obj, math, type, tonumber = obj, math, type, tonumber;
 
 @常用效果
 --value@track:指定轨道,0
