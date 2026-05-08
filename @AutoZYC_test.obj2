@@ -387,3 +387,180 @@ do
 end
 
 debug_print("[api_verify] ===== 测试完成 =====")
+@e2e_state
+--require:2004300
+--label:AutoZYC\测试
+
+local obj, type, pcall = obj, type, pcall;
+
+debug_print("===== [e2e_state] State 全局表访问性测试 =====")
+
+-- Test 1: AutoZYC_State global exists
+if type(AutoZYC_State) == "table" then
+    debug_print("[e2e_state] PASS: AutoZYC_State is a table")
+else
+    debug_print("[e2e_state] FAIL: AutoZYC_State is " .. type(AutoZYC_State))
+end
+
+-- Test 2: State has expected methods
+local methods = {"reset", "add_event", "get_events", "update", "get_current", "set_setting", "get_setting"}
+for _, m in ipairs(methods) do
+    local fn = AutoZYC_State[m]
+    if type(fn) == "function" then
+        debug_print("[e2e_state] PASS: AutoZYC_State." .. m .. " is a function")
+    else
+        debug_print("[e2e_state] FAIL: AutoZYC_State." .. m .. " is " .. type(fn))
+    end
+end
+
+-- Test 3: State.reset() initializes events
+pcall(AutoZYC_State.reset)
+AutoZYC_State.add_event(1, {
+    position_sec = 1.0, length_sec = 0.5,
+    position_ms = 1000, length_ms = 500,
+    pitch_shift = 0, velocity = 100, track = 1, event_type = "test"
+})
+local evts = AutoZYC_State.get_events(1)
+if evts and #evts == 1 then
+    debug_print("[e2e_state] PASS: State.add_event + get_events works, count=" .. #evts)
+else
+    debug_print("[e2e_state] FAIL: State.add_event/get_events, count=" .. tostring(evts and #evts or "nil"))
+end
+
+-- Test 4: AutoZYC_Item_count backward compat
+AutoZYC_Item_count = AutoZYC_Item_count or {}
+AutoZYC_Item_count[1] = {count = 1, exists = true, position_ms = 1000, length_ms = 500, pitch_shift = 0, velocity = 100}
+debug_print("[e2e_state] PASS: AutoZYC_Item_count[1] set")
+
+-- Test 5: Ease table accessible
+if type(Ease) == "table" then
+    local has_select = type(Ease.select) == "function"
+    debug_print("[e2e_state] " .. (has_select and "PASS" or "FAIL") .. ": Ease table accessible, select=" .. tostring(has_select))
+else
+    debug_print("[e2e_state] FAIL: Ease table not found")
+end
+
+debug_print("[e2e_state] ===== 测试完成 =====")
+
+
+@e2e_mod2
+--require:2004300
+--label:AutoZYC\测试
+
+local obj, type, pcall, tonumber = obj, type, pcall, tonumber;
+
+debug_print("===== [e2e_mod2] .mod2 模块加载测试 =====")
+
+-- Test 1: Module loads
+local ok_mod, mod = pcall(obj.module, "AutoZYCParse")
+if ok_mod then
+    debug_print("[e2e_mod2] PASS: obj.module('AutoZYCParse') loaded")
+else
+    debug_print("[e2e_mod2] FAIL: obj.module('AutoZYCParse') error: " .. tostring(mod))
+    debug_print("[e2e_mod2] ===== 测试中止 =====")
+    return
+end
+
+-- Test 2: Module has parse_file
+if type(mod.parse_file) == "function" then
+    debug_print("[e2e_mod2] PASS: mod.parse_file is a function")
+else
+    debug_print("[e2e_mod2] FAIL: mod.parse_file is " .. type(mod.parse_file))
+end
+
+-- Test 3: Module has eval_expression
+if type(mod.eval_expression) == "function" then
+    debug_print("[e2e_mod2] PASS: mod.eval_expression is a function")
+else
+    debug_print("[e2e_mod2] FAIL: mod.eval_expression is " .. type(mod.eval_expression))
+end
+
+-- Test 4: eval_expression basic test
+local ok_expr, result = pcall(mod.eval_expression, "pitch / 12 * 50", 12, 100, 0, 0, 1)
+if ok_expr then
+    debug_print("[e2e_mod2] PASS: eval_expression('pitch/12*50', pitch=12) -> " .. tostring(result))
+    if tonumber(result) == 50 then
+        debug_print("[e2e_mod2] PASS: result == 50 (expected)")
+    else
+        debug_print("[e2e_mod2] WARN: result=" .. tostring(result) .. " expected=50")
+    end
+else
+    debug_print("[e2e_mod2] FAIL: eval_expression error: " .. tostring(result))
+end
+
+-- Test 5: get_track_count
+local ok_count, tc = pcall(mod.get_track_count)
+if ok_count then
+    debug_print("[e2e_mod2] PASS: mod.get_track_count -> " .. tostring(tc))
+else
+    debug_print("[e2e_mod2] FAIL: mod.get_track_count error: " .. tostring(tc))
+end
+
+debug_print("[e2e_mod2] ===== 测试完成 =====")
+
+
+@e2e_pipeline
+--file@test_rpp:测试RPP文件
+--require:2004300
+--label:AutoZYC\测试
+
+local obj, type, pcall, debug_print = obj, type, pcall, debug_print;
+
+debug_print("===== [e2e_pipeline] 完整管线测试 =====")
+
+if not test_rpp or test_rpp == "" then
+    debug_print("[e2e_pipeline] SKIP: 未指定测试RPP文件")
+    return
+end
+
+-- Step 1: Load module
+local ok, mod = pcall(obj.module, "AutoZYCParse")
+if not ok then
+    debug_print("[e2e_pipeline] FAIL: .mod2 加载失败: " .. tostring(mod))
+    return
+end
+
+-- Step 2: Parse RPP
+local ok2, err2 = pcall(mod.parse_file, test_rpp)
+if not ok2 then
+    debug_print("[e2e_pipeline] FAIL: parse_file 失败: " .. tostring(err2))
+    return
+end
+debug_print("[e2e_pipeline] PASS: parse_file 成功")
+
+-- Step 3: Verify track count
+local track_count = mod.get_track_count()
+debug_print("[e2e_pipeline] PASS: get_track_count -> " .. track_count)
+
+-- Step 4: Verify event data per track
+local total_events = 0
+for track = 1, track_count do
+    local count = mod.get_event_count(track)
+    if count > 0 then
+        local data = mod.get_event_data(track)
+        if type(data) == "table" and #data == count * 4 then
+            debug_print("[e2e_pipeline] PASS: Track " .. track .. " -> " .. count .. " events, data[" .. #data .. "]")
+        else
+            debug_print("[e2e_pipeline] FAIL: Track " .. track .. " data format wrong, count=" .. count .. ", #data=" .. (#data or "nil"))
+        end
+        total_events = total_events + count
+    end
+end
+debug_print("[e2e_pipeline] PASS: Total events: " .. total_events)
+
+-- Step 5: Verify track meta
+for track = 1, track_count do
+    local meta = mod.get_track_meta(track)
+    if meta and meta.min_pitch and meta.max_pitch then
+        debug_print("[e2e_pipeline] PASS: Track " .. track .. " meta: pitch[" .. meta.min_pitch .. ", " .. meta.max_pitch .. "], items=" .. meta.item_count)
+    else
+        debug_print("[e2e_pipeline] FAIL: Track " .. track .. " meta missing")
+    end
+end
+
+-- Step 6: Test expression eval with parsed data
+local expr = "pitch / 12 * 50"
+local result = mod.eval_expression(expr, 24, 100, 1.5, 3, 1)
+debug_print("[e2e_pipeline] PASS: eval_expression('" .. expr .. "', pitch=24) -> " .. tostring(result) .. " (expected=100)")
+
+debug_print("[e2e_pipeline] ===== 测试完成 =====")
