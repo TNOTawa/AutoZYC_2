@@ -1,0 +1,86 @@
+-- ============================================================
+-- AutoZYC v2.0 - 统一缓动函数库
+-- ============================================================
+
+local obj, math = obj, math;
+
+Ease = {}
+
+-- 1. 线性
+function Ease.linear(t) return t end
+
+-- 2. 缓入二次
+function Ease.easeInQuad(t) return t * t end
+
+-- 3. 缓出二次
+function Ease.easeOutQuad(t) return 1 - (1 - t) * (1 - t) end
+
+-- 4. 缓入缓出二次
+function Ease.easeInOutQuad(t)
+    if t < 0.5 then return 2 * t * t
+    else return 1 - 2 * (1 - t) * (1 - t) end
+end
+
+-- 5. 缓入三次
+function Ease.easeInCubic(t) return t * t * t end
+
+-- 6. 缓出三次
+function Ease.easeOutCubic(t) return 1 - (1 - t) ^ 3 end
+
+-- 7. 缓入缓出三次
+function Ease.easeInOutCubic(t)
+    if t < 0.5 then return 4 * t * t * t
+    else return 1 - (-2 * t + 2) ^ 3 / 2 end
+end
+
+-- 8. 缓出弹跳
+function Ease.easeOutBounce(t)
+    local n1 = 7.5625
+    local d1 = 2.75
+    if t < 1 / d1 then
+        return n1 * t * t
+    elseif t < 2 / d1 then
+        t = t - 1.5 / d1
+        return n1 * t * t + 0.75
+    elseif t < 2.5 / d1 then
+        t = t - 2.25 / d1
+        return n1 * t * t + 0.9375
+    else
+        t = t - 2.625 / d1
+        return n1 * t * t + 0.984375
+    end
+end
+
+-- 9. 缓出回退
+function Ease.easeOutBack(t)
+    local c1 = 1.70158
+    local c3 = c1 + 1
+    return 1 + c3 * (t - 1) ^ 3 + c1 * (t - 1) ^ 2
+end
+
+-- 10. 缓出弹性
+function Ease.easeOutElastic(t)
+    if t == 0 or t == 1 then return t end
+    local c4 = 2 * math.pi / 3
+    return 2 ^ (-10 * t) * math.sin((t * 10 - 0.75) * c4) + 1
+end
+
+-- 缓动函数选择器
+function Ease.select(acc, dec)
+    if acc and dec then
+        return Ease.easeInOutQuad
+    elseif acc then
+        return Ease.easeOutQuad
+    elseif dec then
+        return Ease.easeInQuad
+    else
+        return Ease.linear
+    end
+end
+
+-- Verifications (logical):
+-- Ease.linear(0) == 0, Ease.linear(1) == 1
+-- Ease.easeOutBounce(0) == 0, Ease.easeOutBounce(1) == 1
+-- Ease.easeOutElastic(0) == 0, Ease.easeOutElastic(1) == 1
+-- All functions t=0 => 0, t=1 => 1
+-- (future @sections will go here in Wave 2)
