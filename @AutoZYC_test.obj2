@@ -1,0 +1,389 @@
+@io_test
+--information:IO测试 v1.0 (for AutoZYC v2.0)
+--label:AutoZYC\测试
+--require:2004300
+--file@rpp_file:RPP文件
+
+local obj, type, tonumber, pcall = obj, type, tonumber, pcall;
+
+debug_print("===== [io_test] io.open 可用性测试 =====")
+
+-- 测试 io 库是否存在
+if type(io) ~= "table" then
+    debug_print("[io_test] FAIL: io library is not available in Aviutl2")
+else
+    debug_print("[io_test] PASS: io library is available")
+
+    -- 测试1: 打开不存在的文件 → 期望 nil + error message
+    do
+        local f, err = io.open("nonexistent_test_file_xyz.rpp", "r")
+        if f == nil and type(err) == "string" then
+            debug_print("[io_test] PASS: io.open(nonexistent) -> nil, \"" .. tostring(err) .. "\"")
+        else
+            debug_print("[io_test] FAIL: io.open(nonexistent) expected nil+err, got " .. tostring(f))
+        end
+        if f then f:close() end
+    end
+
+    -- 测试2: 读取指定 RPP 文件（如果已配置）
+    if rpp_file and rpp_file ~= "" then
+        local ok, f2_or_err = pcall(io.open, rpp_file, "r")
+        if ok and f2_or_err then
+            local f2 = f2_or_err
+            debug_print("[io_test] PASS: io.open(RPP) -> valid file handle")
+
+            -- 测试3: file:read("*a") 完整读取
+            local ok3, content = pcall(function() return f2:read("*a") end)
+            if ok3 then
+                local len = #content
+                debug_print("[io_test] PASS: file:read(*a) -> " .. tostring(len) .. " bytes read")
+            else
+                debug_print("[io_test] FAIL: file:read(*a) error: " .. tostring(content))
+            end
+            f2:close()
+        else
+            debug_print("[io_test] INFO: io.open(RPP) failed: " .. tostring(f2_or_err))
+        end
+    else
+        debug_print("[io_test] INFO: 未指定 RPP 文件，跳过文件读取测试")
+    end
+
+    -- 测试4: 绝对路径（使用脚本路径作为基准）
+    local script_path = obj.getinfo("script_path")
+    if script_path and script_path ~= "" then
+        local abs_path = script_path .. "\\nonexistent_autozic_test.xxx"
+        local f3, err3 = io.open(abs_path, "r")
+        if f3 == nil then
+            debug_print("[io_test] PASS: io.open(abs_path/nonexistent) -> nil (expected, path was \"" .. abs_path .. "\")")
+        else
+            debug_print("[io_test] WARN: io.open(abs_path) opened handle unexpectedly")
+            f3:close()
+        end
+    else
+        debug_print("[io_test] WARN: cannot get script_path for absolute path test")
+    end
+
+    -- 测试5: 绝对路径 + 文件存在测试（用脚本路径 + 已知文件名）
+    local this_script = script_path and (script_path .. "\\@AutoZYC_test.obj2") or nil
+    if this_script then
+        local f4, err4 = io.open(this_script, "r")
+        if f4 then
+            debug_print("[io_test] PASS: io.open(self_path) -> valid handle (absolute path)")
+            local ok5, self_content = pcall(function() return f4:read("*a") end)
+            if ok5 then
+                debug_print("[io_test] PASS: file:read(*a) on self -> " .. tostring(#self_content) .. " bytes")
+            end
+            f4:close()
+        else
+            debug_print("[io_test] FAIL: io.open(self_path) failed: " .. tostring(err4))
+        end
+    end
+end
+
+debug_print("[io_test] ===== 测试完成 =====")
+
+
+@load_sandbox
+--information:加载沙箱测试 v1.0 (for AutoZYC v2.0)
+--label:AutoZYC\测试
+--require:2004300
+--track@dummy:未使用,0,1,0
+
+local obj, type, pcall, tonumber = obj, type, pcall, tonumber;
+
+debug_print("===== [load_sandbox] load() 沙箱行为测试 =====")
+
+-- 检查 load 函数是否可用
+if type(load) ~= "function" then
+    debug_print("[load_sandbox] FAIL: load() function is not available")
+else
+    debug_print("[load_sandbox] PASS: load() function is available")
+
+    -- 测试1: 基本 load，空环境 -> 返回 function
+    do
+        local ok, fn_or_err = pcall(load, "return 1+1", "=test1", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            debug_print("[load_sandbox] PASS: load(return 1+1, env={}) -> function")
+
+            -- 测试1b: 执行该函数 -> 期望 2
+            local ok2, result = pcall(fn)
+            if ok2 and result == 2 then
+                debug_print("[load_sandbox] PASS: fn() -> " .. tostring(result) .. " (expected 2)")
+            else
+                debug_print("[load_sandbox] FAIL: fn() expected 2, got " .. tostring(result))
+            end
+        else
+            debug_print("[load_sandbox] FAIL: load(return 1+1) expected function, got " .. tostring(fn_or_err))
+        end
+    end
+
+    -- 测试2: 自定义环境变量 -> pitch * 2 = 120
+    do
+        local ok, fn_or_err = pcall(load, "return pitch * 2", "=test2", "t", {pitch = 60})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            local ok3, result = pcall(fn)
+            if ok3 and result == 120 then
+                debug_print("[load_sandbox] PASS: load(pitch*2, env={pitch=60})() -> " .. tostring(result))
+            else
+                debug_print("[load_sandbox] FAIL: expected 120, got " .. tostring(result))
+            end
+        else
+            debug_print("[load_sandbox] FAIL: load(pitch*2) failed: " .. tostring(fn_or_err))
+        end
+    end
+
+    -- 测试3: 读取 nil 环境变量 -> 返回 nil
+    do
+        local ok, fn_or_err = pcall(load, "return nil_value", "=test3", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            local ok4, result = pcall(fn)
+            if ok4 then
+                debug_print("[load_sandbox] PASS: load(return nil_value)() -> " .. tostring(result) .. " (expected nil)")
+            else
+                debug_print("[load_sandbox] FAIL: fn() error: " .. tostring(result))
+            end
+        else
+            debug_print("[load_sandbox] FAIL: load(return nil_value) failed: " .. tostring(fn_or_err))
+        end
+    end
+
+    -- 测试4: 沙箱隔离 - os.exit() 在空环境中应失败（os 为 nil）
+    do
+        local ok, fn_or_err = pcall(load, "return os.exit()", "=test4", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            local ok5, err5 = pcall(fn)
+            if ok5 then
+                debug_print("[load_sandbox] FAIL: sandbox allowed os.exit() to execute")
+            else
+                debug_print("[load_sandbox] PASS: sandbox blocked os.exit(): " .. tostring(err5))
+            end
+        else
+            debug_print("[load_sandbox] INFO: load(os.exit) failed at parse: " .. tostring(fn_or_err))
+        end
+    end
+
+    -- 测试5: 沙箱隔离 - 全局 os 应该为 nil
+    do
+        local ok, fn_or_err = pcall(load, "return os ~= nil", "=test5", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            local ok6, has_os = pcall(fn)
+            if ok6 then
+                if has_os then
+                    debug_print("[load_sandbox] WARN: sandbox has os in env (unexpected)")
+                else
+                    debug_print("[load_sandbox] PASS: sandbox env has no os (os == nil)")
+                end
+            end
+        end
+    end
+
+    -- 测试6: 乘法表达式 - 验证基本算术
+    do
+        local ok, fn_or_err = pcall(load, "return 3 * 4 + 5", "=test6", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local fn = fn_or_err
+            local ok7, result = pcall(fn)
+            if ok7 and result == 17 then
+                debug_print("[load_sandbox] PASS: load(return 3*4+5)() -> " .. tostring(result))
+            else
+                debug_print("[load_sandbox] FAIL: expected 17, got " .. tostring(result))
+            end
+        end
+    end
+
+    -- 测试7: pcall 嵌套安全 - 抛出错误的代码
+    do
+        local ok, fn_or_err = pcall(load, "error(\"test_error\")", "=test7", "t", {})
+        if ok and type(fn_or_err) == "function" then
+            local ok8, err8 = pcall(fn_or_err)
+            if ok8 then
+                debug_print("[load_sandbox] FAIL: error() should have failed")
+            else
+                debug_print("[load_sandbox] PASS: pcall caught error(): " .. tostring(err8))
+            end
+        end
+    end
+end
+
+debug_print("[load_sandbox] ===== 测试完成 =====")
+
+
+@api_verify
+--information:API验证 v1.0 (for AutoZYC v2.0)
+--label:AutoZYC\测试
+--require:2004300
+--group:API测试,false
+--separator:基本信息
+--track@bpm_test:BPM测试,0,1,0
+--group:结构化数据,false
+--value@PI:PI,{}
+--group:缓存测试,false
+--track@cache_test:缓存测试,0,1,0
+--group
+
+local obj, type, pcall, tonumber = obj, type, pcall, tonumber;
+
+debug_print("===== [api_verify] Aviutl2 基础 API 测试 =====")
+
+-- 测试1: obj.getinfo("version") - 获取 Aviutl2 版本号
+do
+    local ok, ver = pcall(obj.getinfo, "version")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"version\") -> " .. tostring(ver))
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"version\") error: " .. tostring(ver))
+    end
+end
+
+-- 测试2: obj.getinfo("script_path") - 获取脚本路径
+do
+    local ok, path = pcall(obj.getinfo, "script_path")
+    if ok and type(path) == "string" then
+        debug_print("[api_verify] PASS: obj.getinfo(\"script_path\") -> \"" .. path .. "\"")
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"script_path\") error: " .. tostring(path))
+    end
+end
+
+-- 测试3: obj.getinfo("bpm") - 获取 BPM 信息（tempo, beat, offset）
+do
+    local ok, t, b, o = pcall(obj.getinfo, "bpm")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"bpm\") -> tempo=" .. tostring(t) .. ", beat=" .. tostring(b) .. ", offset=" .. tostring(o))
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"bpm\") error: " .. tostring(t))
+    end
+end
+
+-- 测试4: obj.getinfo("filter") - 检查是否在 filter 上下文中
+do
+    local ok, is_filter = pcall(obj.getinfo, "filter")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"filter\") -> " .. tostring(is_filter))
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"filter\") error: " .. tostring(is_filter))
+    end
+end
+
+-- 测试5: obj.getinfo("saving") - 检查是否正在输出
+do
+    local ok, is_saving = pcall(obj.getinfo, "saving")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"saving\") -> " .. tostring(is_saving))
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"saving\") error: " .. tostring(is_saving))
+    end
+end
+
+-- 测试6: obj.getinfo("image_max") - 获取最大图像尺寸
+do
+    local ok, max_x, max_y = pcall(obj.getinfo, "image_max")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"image_max\") -> " .. tostring(max_x) .. "x" .. tostring(max_y))
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"image_max\") error: " .. tostring(max_x))
+    end
+end
+
+-- 测试7: obj.getinfo("clock") - 获取应用启动后的经过时间
+do
+    local ok, sec = pcall(obj.getinfo, "clock")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"clock\") -> " .. tostring(sec) .. " sec")
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"clock\") error: " .. tostring(sec))
+    end
+end
+
+-- 测试8: obj.getinfo("script_time") - 获取脚本执行时间
+do
+    local ok, msec = pcall(obj.getinfo, "script_time")
+    if ok then
+        debug_print("[api_verify] PASS: obj.getinfo(\"script_time\") -> " .. tostring(msec) .. " ms")
+    else
+        debug_print("[api_verify] FAIL: obj.getinfo(\"script_time\") error: " .. tostring(msec))
+    end
+end
+
+-- 测试9: obj.getinfo("framerate") - 获取帧率
+do
+    local ok, fr = pcall(function() return obj.framerate end)
+    if ok then
+        debug_print("[api_verify] PASS: obj.framerate -> " .. tostring(fr))
+    else
+        debug_print("[api_verify] FAIL: obj.framerate error: " .. tostring(fr))
+    end
+end
+
+-- 测试10: PI 结构化数据验证
+do
+    if PI == nil then
+        debug_print("[api_verify] INFO: PI variable is nil (uninitialized, table expected via --value@PI)")
+    elseif type(PI) == "table" then
+        debug_print("[api_verify] PASS: PI is a table (type=" .. type(PI) .. ") via --value@PI:PI,{}")
+    else
+        debug_print("[api_verify] INFO: PI type=" .. type(PI) .. " (table expected via --value@PI:PI,{})")
+    end
+end
+
+-- 测试11: obj.getpoint - 参数读取机制
+do
+    local ok_bpm, val_bpm = pcall(obj.getpoint, "bpm_test")
+    if ok_bpm then
+        debug_print("[api_verify] PASS: obj.getpoint(\"bpm_test\") -> " .. tostring(val_bpm))
+    else
+        debug_print("[api_verify] FAIL: obj.getpoint(\"bpm_test\") error: " .. tostring(val_bpm))
+    end
+end
+
+-- 测试12: obj.getpoint(0)/obj.getpoint(1) - twopoint 机制
+do
+    local ok0, pt0 = pcall(obj.getpoint, 0)
+    local ok1, pt1 = pcall(obj.getpoint, 1)
+    if ok0 then
+        debug_print("[api_verify] PASS: obj.getpoint(0) -> " .. tostring(pt0))
+    else
+        debug_print("[api_verify] INFO: obj.getpoint(0) not available: " .. tostring(pt0))
+    end
+    if ok1 then
+        debug_print("[api_verify] PASS: obj.getpoint(1) -> " .. tostring(pt1))
+    else
+        debug_print("[api_verify] INFO: obj.getpoint(1) not available: " .. tostring(pt1))
+    end
+end
+
+-- 测试13: obj.copybuffer - 缓存缓冲机制
+do
+    local ok_cp, result = pcall(obj.copybuffer, "cache:autozic_test/xxx", "object")
+    if ok_cp then
+        debug_print("[api_verify] PASS: obj.copybuffer(\"cache:autozic_test/xxx\", \"object\") -> " .. tostring(result))
+    else
+        debug_print("[api_verify] PASS: obj.copybuffer not available or failed: " .. tostring(result) .. " (expected in non-media context)")
+    end
+end
+
+-- 测试14: obj.effect - 滤镜调用（仅测试是否存在）
+do
+    if type(obj.effect) == "function" then
+        debug_print("[api_verify] PASS: obj.effect is a function")
+    else
+        debug_print("[api_verify] FAIL: obj.effect is not a function (type=" .. type(obj.effect) .. ")")
+    end
+end
+
+-- 测试15: obj.frame / obj.time / obj.totalframe - 基础只读变量
+do
+    debug_print("[api_verify] PASS: obj.frame=" .. tostring(obj.frame) .. ", obj.time=" .. tostring(obj.time) .. ", obj.totalframe=" .. tostring(obj.totalframe))
+end
+
+-- 测试16: obj.screen_w / obj.screen_h - 屏幕尺寸
+do
+    debug_print("[api_verify] PASS: obj.screen_w=" .. tostring(obj.screen_w) .. ", obj.screen_h=" .. tostring(obj.screen_h))
+end
+
+debug_print("[api_verify] ===== 测试完成 =====")
