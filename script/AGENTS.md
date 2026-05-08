@@ -1,4 +1,4 @@
-# script/ — LuaJIT 脚本层
+﻿# script/ — LuaJIT 脚本层
 
 ## OVERVIEW
 LuaJIT 2.1 scripts for Aviutl2. Three @multi-script files + 1 test file. All UI params, effect orchestration, and PI communication live here.
@@ -7,7 +7,7 @@ LuaJIT 2.1 scripts for Aviutl2. Three @multi-script files + 1 test file. All UI 
 ```
 script/
 ├── @AutoZYC.obj2          # 核心: 数据导入 (@数据导入 + 4 section)
-├── @AutoZYC.tra2          # 缓动: 10 Ease函数 + 6 easing section
+├── @AutoZYC.tra2          # 缓动: 10 Ease函数 + 8 easing section
 ├── @AutoZYC.anm2          # 效果: 4模式翻转 + 2个HLSL着色器
 └── test/
     └── @AutoZYC_test.obj2 # E2E测试套件 (6 section)
@@ -21,13 +21,15 @@ script/
 | @AutoZYC.obj2 | @物件计数器 | Per-frame `State.update()` → backward compat globals |
 | @AutoZYC.obj2 | @物件生成器 | Event-aligned object positioning |
 | @AutoZYC.obj2 | @缓动设置 | Ease index → track/duration mapping |
-| @AutoZYC.tra2 | preamble | `Ease` table (10 easing functions) |
+| @AutoZYC.obj2 | @数据导入 | `Ease` table (10 easing functions) |
 | @AutoZYC.tra2 | @线性运动 | Time-driven 2-point linear interpolation |
 | @AutoZYC.tra2 | @视频播放控制 | Elapsed-time video frame offset |
 | @AutoZYC.tra2 | @音高驱动位置 | Pitch → position via pitch range |
 | @AutoZYC.tra2 | @力度驱动透明度 | Velocity 0-127 → alpha |
 | @AutoZYC.tra2 | @表达式映射 | .mod2 `eval_expression()` → easing |
 | @AutoZYC.tra2 | @BPM同步缓动 | Periodic phase=%1 → easing |
+| @AutoZYC.tra2 | @音乐时间控制 | Note-based time-controlled repeat via `--timecontrol` |
+| @AutoZYC.tra2 | @音乐时间控制往復 | Note-based round-trip time-controlled repeat via `--timecontrol` |
 | @AutoZYC.anm2 | @常用效果 | 4-mode flip + alpha hide on silence |
 | @AutoZYC.anm2 | @色相映射 | HLSL: pitch_normalized → HSV hue rotation |
 | @AutoZYC.anm2 | @亮度映射 | HLSL: velocity → RGB multiplier |
