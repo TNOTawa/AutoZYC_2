@@ -10,10 +10,18 @@ AutoZYC is a LuaJIT script plugin for Aviutl2 that automates otomad (音MAD) vid
 ## STRUCTURE
 ```
 .
-├── @AutoZuoYouChou_parser.obj2    # RPP解析 + 全局状态管理 (199行)
-├── @AutoZuoYouChou_easing.tra2    # 3个缓动脚本(线性运动/视频控制/音高驱动) (217行)
-├── @AutoZuoYouChou_effects.anm2   # 2个效果(镜像反转/物件间Alpha) (108行)
-├── @AutoZuoYouChou_easing.obj2    # 缓动设置存储 (19行)
+├── script/                        # 主脚本目录
+│   ├── @AutoZYC.obj2              # RPP解析 + 全局状态管理
+│   ├── @AutoZYC.tra2              # 缓动动画(线性运动/视频控制/音高驱动)
+│   ├── @AutoZYC.anm2              # 视觉特效(镜像反转/物件间Alpha)
+│   └── test/                      # 测试脚本
+│       └── @AutoZYC_test.obj2     # E2E测试套件
+├── native/AutoZYCParse/           # C++ .mod2 解析模块
+│   └── build/AutoZYCParse.mod2    # 编译产物
+├── dist/                          # 发布包
+│   ├── AutoZYC-v2.0.0.au2pkg.zip
+│   ├── package.ini
+│   └── package.txt
 ├── aviutl2_sdk/                   # Aviutl2 SDK (C++ samples, docs, headers)
 │   └── docs/                      # lua.txt=完整API, aviutl2_plugin_sdk.txt=SDK概览
 ├── docs/
@@ -32,10 +40,10 @@ AutoZYC is a LuaJIT script plugin for Aviutl2 that automates otomad (音MAD) vid
 
 | 任务 | 位置 | 说明 |
 |------|------|------|
-| RPP解析/全局状态 | `@AutoZuoYouChou_parser.obj2` | parse_rpp() + init() 更新全局表 |
-| 缓动函数/动画 | `@AutoZuoYouChou_easing.tra2` | @线性运动 @视频播放控制 @音高驱动位置 |
-| 视觉特效 | `@AutoZuoYouChou_effects.anm2` | @常用效果(镜像+Alpha) |
-| 缓动配置存储 | `@AutoZuoYouChou_easing.obj2` | @缓动设置(编号→轨道/时长) |
+| RPP解析/全局状态 | `script/@AutoZYC.obj2` | parse_rpp() + init() 更新全局表 |
+| 缓动函数/动画 | `script/@AutoZYC.tra2` | @线性运动 @视频播放控制 @音高驱动位置 |
+| 视觉特效 | `script/@AutoZYC.anm2` | @常用效果(镜像+Alpha) |
+| 缓动配置存储 | `script/@AutoZYC.obj2` | @缓动设置(编号→轨道/时长) |
 | Aviutl2 Lua API | `aviutl2_sdk/docs/lua.txt` | obj.* 全部函数 + 参数声明语法 |
 | Aviutl2 SDK概览 | `aviutl2_sdk/docs/aviutl2_plugin_sdk.txt` | 插件类型(.aui2/.auo2/.auf2/.mod2/.aux2) |
 | 重构计划 | `docs/refactoring_report.md` | 详细架构建议 + 实施路线图 |
@@ -48,11 +56,11 @@ AutoZYC is a LuaJIT script plugin for Aviutl2 that automates otomad (音MAD) vid
 
 | 变量 | 来源 | 消费者 |
 |------|------|--------|
-| `AutoZYC_RPPData` | parser.obj2:parse_rpp() | parser.obj2:init() |
-| `AutoZYC_Item_count` | parser.obj2:init() | easing.tra2, effects.anm2 |
-| `AutoZYC_EaseSettings` | easing.obj2 | easing.tra2 |
-| `AutoZYC_PitchRange` | parser.obj2:init() | easing.tra2:@音高驱动位置 |
-| `AutoZYC_GlobalAudioTime` | parser.obj2:init() | easing.tra2 |
+| `AutoZYC_RPPData` | `script/@AutoZYC.obj2` init() | `script/@AutoZYC.obj2` init() |
+| `AutoZYC_Item_count` | `script/@AutoZYC.obj2` init() | `script/@AutoZYC.tra2`, `script/@AutoZYC.anm2` |
+| `AutoZYC_EaseSettings` | `script/@AutoZYC.obj2` | `script/@AutoZYC.tra2` |
+| `AutoZYC_PitchRange` | `script/@AutoZYC.obj2` init() | `script/@AutoZYC.tra2` @音高驱动位置 |
+| `AutoZYC_GlobalAudioTime` | `script/@AutoZYC.obj2` init() | `script/@AutoZYC.tra2` |
 
 ## CONVENTIONS
 

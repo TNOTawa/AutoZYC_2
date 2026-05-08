@@ -1,4 +1,20 @@
+# SDK and references (read-only)
 references/
 aviutl2_sdk/
+
+# Internal state
 .sisyphus/
 .swarm/
+
+# Build artifacts
+*.o
+*.obj
+*.exe
+
+# Temp
+_pkg_tmp/
+
+# IDE
+.vs/
+.vscode/
+*.swp

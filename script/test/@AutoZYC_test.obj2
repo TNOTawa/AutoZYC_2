@@ -1,4 +1,4 @@
-@io_test
+﻿﻿@io_test
 --information:IO测试 v1.0 (for AutoZYC v2.0)
 --label:AutoZYC\测试
 --require:2004300
@@ -6,15 +6,14 @@
 
 local obj, type, tonumber, pcall = obj, type, tonumber, pcall;
 
-debug_print("===== [io_test] io.open 可用性测试 =====")
+debug_print("===== [io_test] io.open 可用性测�?=====")
 
--- 测试 io 库是否存在
-if type(io) ~= "table" then
+-- 测试 io 库是否存�?if type(io) ~= "table" then
     debug_print("[io_test] FAIL: io library is not available in Aviutl2")
 else
     debug_print("[io_test] PASS: io library is available")
 
-    -- 测试1: 打开不存在的文件 → 期望 nil + error message
+    -- 测试1: 打开不存在的文件 �?期望 nil + error message
     do
         local f, err = io.open("nonexistent_test_file_xyz.rpp", "r")
         if f == nil and type(err) == "string" then
@@ -25,8 +24,7 @@ else
         if f then f:close() end
     end
 
-    -- 测试2: 读取指定 RPP 文件（如果已配置）
-    if rpp_file and rpp_file ~= "" then
+    -- 测试2: 读取指定 RPP 文件（如果已配置�?    if rpp_file and rpp_file ~= "" then
         local ok, f2_or_err = pcall(io.open, rpp_file, "r")
         if ok and f2_or_err then
             local f2 = f2_or_err
@@ -45,7 +43,7 @@ else
             debug_print("[io_test] INFO: io.open(RPP) failed: " .. tostring(f2_or_err))
         end
     else
-        debug_print("[io_test] INFO: 未指定 RPP 文件，跳过文件读取测试")
+        debug_print("[io_test] INFO: 未指�?RPP 文件，跳过文件读取测�?)
     end
 
     -- 测试4: 绝对路径（使用脚本路径作为基准）
@@ -87,13 +85,13 @@ debug_print("[io_test] ===== 测试完成 =====")
 --information:加载沙箱测试 v1.0 (for AutoZYC v2.0)
 --label:AutoZYC\测试
 --require:2004300
---track@dummy:未使用,0,1,0
+--track@dummy:未使�?0,1,0
 
 local obj, type, pcall, tonumber = obj, type, pcall, tonumber;
 
 debug_print("===== [load_sandbox] load() 沙箱行为测试 =====")
 
--- 检查 load 函数是否可用
+-- 检�?load 函数是否可用
 if type(load) ~= "function" then
     debug_print("[load_sandbox] FAIL: load() function is not available")
 else
@@ -106,7 +104,7 @@ else
             local fn = fn_or_err
             debug_print("[load_sandbox] PASS: load(return 1+1, env={}) -> function")
 
-            -- 测试1b: 执行该函数 -> 期望 2
+            -- 测试1b: 执行该函�?-> 期望 2
             local ok2, result = pcall(fn)
             if ok2 and result == 2 then
                 debug_print("[load_sandbox] PASS: fn() -> " .. tostring(result) .. " (expected 2)")
@@ -118,7 +116,7 @@ else
         end
     end
 
-    -- 测试2: 自定义环境变量 -> pitch * 2 = 120
+    -- 测试2: 自定义环境变�?-> pitch * 2 = 120
     do
         local ok, fn_or_err = pcall(load, "return pitch * 2", "=test2", "t", {pitch = 60})
         if ok and type(fn_or_err) == "function" then
@@ -150,8 +148,7 @@ else
         end
     end
 
-    -- 测试4: 沙箱隔离 - os.exit() 在空环境中应失败（os 为 nil）
-    do
+    -- 测试4: 沙箱隔离 - os.exit() 在空环境中应失败（os �?nil�?    do
         local ok, fn_or_err = pcall(load, "return os.exit()", "=test4", "t", {})
         if ok and type(fn_or_err) == "function" then
             local fn = fn_or_err
@@ -166,7 +163,7 @@ else
         end
     end
 
-    -- 测试5: 沙箱隔离 - 全局 os 应该为 nil
+    -- 测试5: 沙箱隔离 - 全局 os 应该�?nil
     do
         local ok, fn_or_err = pcall(load, "return os ~= nil", "=test5", "t", {})
         if ok and type(fn_or_err) == "function" then
@@ -182,7 +179,7 @@ else
         end
     end
 
-    -- 测试6: 乘法表达式 - 验证基本算术
+    -- 测试6: 乘法表达�?- 验证基本算术
     do
         local ok, fn_or_err = pcall(load, "return 3 * 4 + 5", "=test6", "t", {})
         if ok and type(fn_or_err) == "function" then
@@ -196,8 +193,7 @@ else
         end
     end
 
-    -- 测试7: pcall 嵌套安全 - 抛出错误的代码
-    do
+    -- 测试7: pcall 嵌套安全 - 抛出错误的代�?    do
         local ok, fn_or_err = pcall(load, "error(\"test_error\")", "=test7", "t", {})
         if ok and type(fn_or_err) == "function" then
             local ok8, err8 = pcall(fn_or_err)
@@ -220,7 +216,7 @@ debug_print("[load_sandbox] ===== 测试完成 =====")
 --group:API测试,false
 --separator:基本信息
 --track@bpm_test:BPM测试,0,1,0
---group:结构化数据,false
+--group:结构化数�?false
 --value@PI:PI,{}
 --group:缓存测试,false
 --track@cache_test:缓存测试,0,1,0
@@ -230,8 +226,7 @@ local obj, type, pcall, tonumber = obj, type, pcall, tonumber;
 
 debug_print("===== [api_verify] Aviutl2 基础 API 测试 =====")
 
--- 测试1: obj.getinfo("version") - 获取 Aviutl2 版本号
-do
+-- 测试1: obj.getinfo("version") - 获取 Aviutl2 版本�?do
     local ok, ver = pcall(obj.getinfo, "version")
     if ok then
         debug_print("[api_verify] PASS: obj.getinfo(\"version\") -> " .. tostring(ver))
@@ -250,8 +245,7 @@ do
     end
 end
 
--- 测试3: obj.getinfo("bpm") - 获取 BPM 信息（tempo, beat, offset）
-do
+-- 测试3: obj.getinfo("bpm") - 获取 BPM 信息（tempo, beat, offset�?do
     local ok, t, b, o = pcall(obj.getinfo, "bpm")
     if ok then
         debug_print("[api_verify] PASS: obj.getinfo(\"bpm\") -> tempo=" .. tostring(t) .. ", beat=" .. tostring(b) .. ", offset=" .. tostring(o))
@@ -270,8 +264,7 @@ do
     end
 end
 
--- 测试5: obj.getinfo("saving") - 检查是否正在输出
-do
+-- 测试5: obj.getinfo("saving") - 检查是否正在输�?do
     local ok, is_saving = pcall(obj.getinfo, "saving")
     if ok then
         debug_print("[api_verify] PASS: obj.getinfo(\"saving\") -> " .. tostring(is_saving))
@@ -280,8 +273,7 @@ do
     end
 end
 
--- 测试6: obj.getinfo("image_max") - 获取最大图像尺寸
-do
+-- 测试6: obj.getinfo("image_max") - 获取最大图像尺�?do
     local ok, max_x, max_y = pcall(obj.getinfo, "image_max")
     if ok then
         debug_print("[api_verify] PASS: obj.getinfo(\"image_max\") -> " .. tostring(max_x) .. "x" .. tostring(max_y))
@@ -320,8 +312,7 @@ do
     end
 end
 
--- 测试10: PI 结构化数据验证
-do
+-- 测试10: PI 结构化数据验�?do
     if PI == nil then
         debug_print("[api_verify] INFO: PI variable is nil (uninitialized, table expected via --value@PI)")
     elseif type(PI) == "table" then
@@ -367,8 +358,7 @@ do
     end
 end
 
--- 测试14: obj.effect - 滤镜调用（仅测试是否存在）
-do
+-- 测试14: obj.effect - 滤镜调用（仅测试是否存在�?do
     if type(obj.effect) == "function" then
         debug_print("[api_verify] PASS: obj.effect is a function")
     else
@@ -393,7 +383,12 @@ debug_print("[api_verify] ===== 测试完成 =====")
 
 local obj, type, pcall = obj, type, pcall;
 
-debug_print("===== [e2e_state] State 全局表访问性测试 =====")
+if AutoZYC_State == nil then
+    debug_print('[e2e_state] SKIP: AutoZYC_State not initialized (load @AutoZYC.obj2 first)')
+    debug_print('[e2e_state] ===== 测试中止=====')
+    return
+end
+debug_print("===== [e2e_state] State 全局表访问性测�?=====")
 
 -- Test 1: AutoZYC_State global exists
 if type(AutoZYC_State) == "table" then
