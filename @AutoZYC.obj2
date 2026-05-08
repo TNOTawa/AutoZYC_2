@@ -1,0 +1,614 @@
+-- ============================================================
+-- AutoZYC v2.0 - 核心基础设施
+-- 共享序言: 工具函数 + 全局状态管理
+-- ============================================================
+
+local obj, math, tonumber, type, ipairs, pairs, table, string, debug_print =
+    obj, math, tonumber, type, ipairs, pairs, table, string, debug_print;
+
+-- ============================================================
+-- T9: 工具函数
+-- ============================================================
+
+local function clamp(val, min_val, max_val)
+    if val < min_val then return min_val end
+    if val > max_val then return max_val end
+    return val
+end
+
+local function normalize(val, min_val, max_val)
+    if max_val == min_val then return 0.5 end
+    return (val - min_val) / (max_val - min_val)
+end
+
+local function lerp(a, b, t)
+    return a + (b - a) * t
+end
+
+local function map(val, srcMin, srcMax, dstMin, dstMax)
+    return lerp(dstMin, dstMax, normalize(val, srcMin, srcMax))
+end
+
+local function safe_tonumber(val, default)
+    if type(val) == "number" then return val end
+    local n = tonumber(val)
+    if n then return n end
+    return default or 0
+end
+
+local function is_number(val)
+    return type(val) == "number"
+end
+
+local function sec_to_ms(s)
+    return math.floor(tonumber(s) * 1000 + 0.5)
+end
+
+-- ============================================================
+-- T4: 全局状态管理 (唯一全局表)
+-- ============================================================
+
+AutoZYC_State = {}
+local State = AutoZYC_State
+
+local function State_init()
+    State.events = {}
+    State.track_meta = {}
+    State.play_state = {}
+    State.global_time = 0
+    State.settings = {}
+end
+
+function State.reset()
+    State_init()
+end
+
+function State.add_event(track, evt)
+    if not State.events[track] then
+        State.events[track] = {}
+    end
+    table.insert(State.events[track], evt)
+end
+
+function State.get_events(track)
+    return State.events[track] or {}
+end
+
+function State.update(time)
+    State.global_time = time
+    local t_ms = time * 1000
+
+    for track, items in pairs(State.events) do
+        local state = State.play_state[track] or {
+            current_item = 0,
+            is_playing = false,
+            item_start_ms = 0,
+            length_ms = 0,
+            pitch = 0,
+            velocity = 0
+        }
+        state.current_item = 0
+        state.is_playing = false
+
+        for idx, item in ipairs(items) do
+            local start = item.position_ms
+            local finish = start + item.length_ms
+
+            if t_ms >= start and t_ms < finish then
+                state.current_item = idx
+                state.is_playing = true
+                state.item_start_ms = start
+                state.length_ms = item.length_ms
+                state.pitch = item.pitch_shift or 0
+                state.velocity = item.velocity or 0
+                break
+            end
+        end
+
+        State.play_state[track] = state
+    end
+end
+
+function State.get_current(track)
+    local s = State.play_state[track]
+    if not s then
+        return {
+            current_item = 0,
+            is_playing = false,
+            pitch = 0,
+            velocity = 0,
+            item_start_ms = 0,
+            length_ms = 0
+        }
+    end
+    return s
+end
+
+function State.set_setting(idx, track_idx, dur)
+    State.settings[idx] = {track = track_idx, duration = dur}
+end
+
+function State.get_setting(idx)
+    return State.settings[idx]
+end
+
+State_init()
+
+-- ============================================================
+-- @RPP导入 (T6: RPP解析 + T8: RPP内MIDI物件)
+-- ============================================================
+
+@RPP导入
+--file@rpp_file:RPP文件
+--require:2004300
+--label:AutoZYC\RPP导入
+
+-- T8: RPP内MIDI物件解析
+local function parse_rpp_midi(midi_lines, track_number, base_offset_sec)
+    local ticks_per_quarter = 960
+    local tempo_us = 500000
+    local tick_duration_sec = tempo_us / 1000000 / ticks_per_quarter
+
+    local hasdata_found = false
+    local pending_notes = {}
+
+    local lines_iter = midi_lines:gmatch("[^\r\n]+")
+    for line in lines_iter do
+        line = line:match("^%s*(.-)%s*$") or ""
+
+        if line:find("^HASDATA%s") then
+            local tp = line:match("HASDATA%s+(%d+)")
+            if tp then
+                ticks_per_quarter = tonumber(tp) or 960
+                tick_duration_sec = tempo_us / 1000000 / ticks_per_quarter
+                hasdata_found = true
+            end
+        elseif line:find("^e%s") then
+            local offset_hex, flags_hex, note_hex, velocity_hex =
+                line:match("^e%s+(%x+)%s+(%x+)%s+(%x+)%s+(%x+)")
+            if offset_hex and flags_hex and note_hex and velocity_hex then
+                local offset = tonumber(offset_hex, 16) or 0
+                local flags = tonumber(flags_hex, 16) or 0
+                local note_num = tonumber(note_hex, 16) or 0
+                local vel = tonumber(velocity_hex, 16) or 0
+
+                local position_sec = base_offset_sec + offset * tick_duration_sec
+
+                if flags == 0x90 and vel > 0 then
+                    pending_notes[note_num] = {
+                        offset = offset,
+                        velocity = vel,
+                        position_sec = position_sec
+                    }
+                elseif flags == 0x80 or (flags == 0x90 and vel == 0) then
+                    local note_on = pending_notes[note_num]
+                    if note_on then
+                        local length_sec = (offset - note_on.offset) * tick_duration_sec
+
+                        State.add_event(track_number, {
+                            position_sec = note_on.position_sec,
+                            length_sec = length_sec,
+                            position_ms = sec_to_ms(note_on.position_sec),
+                            length_ms = sec_to_ms(length_sec),
+                            pitch_shift = note_num - 69,
+                            velocity = note_on.velocity,
+                            track = track_number,
+                            event_type = "midi"
+                        })
+                        pending_notes[note_num] = nil
+                    end
+                end
+            end
+        elseif line:find("^E%s") then
+            -- 跳过非音符MIDI事件
+        end
+    end
+
+    if not hasdata_found then
+        debug_print("[RPP导入] RPP内MIDI块缺少HASDATA行")
+    end
+end
+
+-- T6: RPP文件解析器
+function parse_rpp(content)
+    local current_track = 0
+    local lines_iter = content:gmatch("[^\r\n]+")
+
+    for line in lines_iter do
+        line = line:match("^%s*(.-)%s*$") or ""
+
+        if line:find("^<TRACK") then
+            current_track = current_track + 1
+
+        elseif line:find("^<ITEM") then
+            if current_track < 1 then
+                local depth = 1
+                while depth > 0 do
+                    local inner_line = lines_iter()
+                    if not inner_line then break end
+                    inner_line = inner_line:match("^%s*(.-)%s*$") or ""
+                    if inner_line:find("^<") and inner_line ~= ">" then
+                        depth = depth + 1
+                    elseif inner_line == ">" then
+                        depth = depth - 1
+                    end
+                end
+            else
+                local item = {
+                    position_sec = 0,
+                    length_sec = 0,
+                    position_ms = 0,
+                    length_ms = 0,
+                    pitch_shift = 0
+                }
+
+                local depth = 1
+                local source_midi_lines = nil
+
+                while depth > 0 do
+                    local inner_line = lines_iter()
+                    if not inner_line then break end
+                    inner_line = inner_line:match("^%s*(.-)%s*$") or ""
+
+                    if inner_line:find("^<SOURCE MIDI") then
+                        source_midi_lines = {inner_line}
+                        depth = depth + 1
+                    elseif inner_line:find("^<") and inner_line ~= ">" then
+                        depth = depth + 1
+                    elseif inner_line == ">" then
+                        depth = depth - 1
+                        if source_midi_lines and depth > 0 then
+                            table.insert(source_midi_lines, inner_line)
+                        end
+                    else
+                        if source_midi_lines then
+                            table.insert(source_midi_lines, inner_line)
+                        end
+
+                        if inner_line:find("^POSITION%s") then
+                            local val = inner_line:match("POSITION%s+(%S+)")
+                            if val then
+                                item.position_sec = tonumber(val) or 0
+                                item.position_ms = sec_to_ms(item.position_sec)
+                            end
+                        elseif inner_line:find("^LENGTH%s") then
+                            local val = inner_line:match("LENGTH%s+(%S+)")
+                            if val then
+                                item.length_sec = tonumber(val) or 0
+                                item.length_ms = sec_to_ms(item.length_sec)
+                            end
+                        elseif inner_line:find("^PLAYRATE%s") then
+                            local playrate_str = inner_line:match("PLAYRATE%s+(.*)")
+                            if playrate_str then
+                                local parts = {}
+                                for part in playrate_str:gmatch("%S+") do
+                                    table.insert(parts, part)
+                                end
+                                if #parts >= 3 then
+                                    item.pitch_shift = tonumber(parts[3]) or 0
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if source_midi_lines then
+                    local midi_content = table.concat(source_midi_lines, "\n")
+                    parse_rpp_midi(midi_content, current_track, item.position_sec)
+                else
+                    State.add_event(current_track, {
+                        position_sec = item.position_sec,
+                        length_sec = item.length_sec,
+                        position_ms = item.position_ms,
+                        length_ms = item.length_ms,
+                        pitch_shift = item.pitch_shift,
+                        velocity = 100,
+                        track = current_track,
+                        event_type = "audio"
+                    })
+                end
+            end
+        end
+    end
+end
+
+function init()
+    if not rpp_file or rpp_file == "" then
+        return
+    end
+
+    if obj.frame == 1 or not next(State.events) then
+        State.reset()
+
+        local file, err = io.open(rpp_file, "r")
+        if not file then
+            debug_print("[RPP导入] 无法打开文件: " .. (err or rpp_file))
+            return
+        end
+        local content = file:read("*a")
+        file:close()
+
+        parse_rpp(content)
+
+        for track, items in pairs(State.events) do
+            if #items > 0 then
+                local min_p = items[1].pitch_shift
+                local max_p = items[1].pitch_shift
+                for _, item in ipairs(items) do
+                    local p = item.pitch_shift
+                    if p < min_p then min_p = p end
+                    if p > max_p then max_p = p end
+                end
+                if min_p == max_p then
+                    min_p = min_p - 1
+                    max_p = max_p + 1
+                end
+                State.track_meta[track] = {
+                    name = string.format("Track %d", track),
+                    min_pitch = min_p,
+                    max_pitch = max_p,
+                    item_count = #items
+                }
+            else
+                State.track_meta[track] = {
+                    name = string.format("Track %d", track),
+                    min_pitch = -12,
+                    max_pitch = 12,
+                    item_count = 0
+                }
+            end
+        end
+
+        local total = 0
+        for _, items in pairs(State.events) do
+            total = total + #items
+        end
+        debug_print(string.format("[RPP导入] 解析完成 (共 %d 个事件)", total))
+    end
+
+    State.update(obj.time)
+end
+
+init()
+
+-- ============================================================
+-- @MIDI导入 (T7: 标准MIDI文件解析)
+-- ============================================================
+
+@MIDI导入
+--file@midi_file:MIDI文件
+--require:2004300
+--label:AutoZYC\MIDI导入
+
+-- 读取大端序32位整数
+local function read_be32(s, pos)
+    local b1, b2, b3, b4 = string.byte(s, pos, pos + 3)
+    return (b1 * 16777216) + (b2 * 65536) + (b3 * 256) + b4
+end
+
+-- 读取大端序16位整数
+local function read_be16(s, pos)
+    local b1, b2 = string.byte(s, pos, pos + 1)
+    return (b1 * 256) + b2
+end
+
+-- 读取变长数量
+local function read_varlen(s, pos)
+    local value = 0
+    local byte
+    repeat
+        byte = string.byte(s, pos)
+        pos = pos + 1
+        value = value * 128 + (byte % 128)
+    until byte < 128
+    return value, pos
+end
+
+function parse_midi(content)
+    if not content or #content < 14 then
+        debug_print("[MIDI导入] 文件内容为空或过短")
+        return
+    end
+
+    local data = content
+    if type(data) == "string" and #data < 14 then return end
+
+    local pos = 1
+
+    -- SMF 头块 "MThd"
+    if string.sub(data, pos, pos + 3) ~= "MThd" then
+        debug_print("[MIDI导入] 无效的MIDI文件头")
+        return
+    end
+    pos = pos + 4
+
+    local header_len = read_be32(data, pos)
+    pos = pos + 4
+
+    local format = read_be16(data, pos)
+    pos = pos + 2
+
+    local ntrks = read_be16(data, pos)
+    pos = pos + 2
+
+    local division = read_be16(data, pos)
+    pos = pos + 2
+
+    -- 跳过剩余头长度
+    pos = pos + math.max(0, header_len - 6)
+
+    -- 节拍计时
+    local ticks_per_quarter = division
+    if division >= 0x8000 then
+        debug_print("[MIDI导入] 不支持SMPTE时间码格式")
+        return
+    end
+
+    local tempo_us = 500000  -- 默认 120 BPM
+
+    -- 逐轨解析
+    for track_num = 1, ntrks do
+        if pos + 8 > #data then break end
+
+        if string.sub(data, pos, pos + 3) ~= "MTrk" then
+            debug_print(string.format("[MIDI导入] 轨道 %d 缺少MTrk头", track_num))
+            break
+        end
+        pos = pos + 4
+
+        local track_len = read_be32(data, pos)
+        pos = pos + 4
+
+        local track_end = pos + track_len
+        if track_end > #data then
+            track_end = #data
+        end
+
+        local cumulative_ticks = 0
+        local last_status = 0
+        local pending_notes = {}
+
+        while pos < track_end do
+            -- 读取变长增量时间
+            local delta_ticks
+            delta_ticks, pos = read_varlen(data, pos)
+            cumulative_ticks = cumulative_ticks + delta_ticks
+
+            -- 读取状态字节
+            local status = string.byte(data, pos)
+            if status < 0x80 then
+                -- 运行状态: 复用上一个状态
+                if last_status >= 0x80 then
+                    status = last_status
+                else
+                    -- 没有有效的运行状态，跳过此字节
+                    debug_print("[MIDI导入] 运行状态字节失效")
+                    break
+            else
+                pos = pos + 1
+            end
+
+            if status >= 0xF0 then
+                -- 系统消息
+                if status == 0xFF then
+                    local meta_type = string.byte(data, pos)
+                    pos = pos + 1
+
+                    local meta_len
+                    meta_len, pos = read_varlen(data, pos)
+
+                    if meta_type == 0x51 and meta_len >= 3 then
+                        -- 设置速度
+                        local b1, b2, b3 = string.byte(data, pos, pos + 2)
+                        tempo_us = b1 * 65536 + b2 * 256 + b3
+                    end
+
+                    pos = pos + meta_len
+                elseif status == 0xF0 or status == 0xF7 then
+                    -- SysEx: 跳过
+                    local sysex_len
+                    sysex_len, pos = read_varlen(data, pos)
+                    pos = pos + sysex_len
+                end
+                -- 不重置 last_status; 系统消息不影响声音消息的运行状态
+            else
+                -- 声音消息
+                last_status = status
+                local msg_type = status - (status % 0x10)
+
+                if pos + 1 > track_end then break end
+                local data1 = string.byte(data, pos)
+                local data2 = string.byte(data, pos + 1)
+                pos = pos + 2
+
+                if msg_type == 0x80 or (msg_type == 0x90 and data2 == 0) then
+                    -- Note Off (或 velocity=0 的 Note On)
+                    local note_on = pending_notes[data1]
+                    if note_on then
+                        local note_length_ticks = cumulative_ticks - note_on.start_ticks
+                        local note_length_sec = note_length_ticks * tempo_us / 1000000 / ticks_per_quarter
+
+                        State.add_event(track_num, {
+                            position_sec = note_on.position_sec,
+                            length_sec = note_length_sec,
+                            position_ms = sec_to_ms(note_on.position_sec),
+                            length_ms = sec_to_ms(note_length_sec),
+                            pitch_shift = data1 - 69,
+                            velocity = note_on.velocity,
+                            track = track_num,
+                            event_type = "midi"
+                        })
+                        pending_notes[data1] = nil
+                    end
+                elseif msg_type == 0x90 and data2 > 0 then
+                    -- Note On
+                    local position_sec = cumulative_ticks * tempo_us / 1000000 / ticks_per_quarter
+                    pending_notes[data1] = {
+                        start_ticks = cumulative_ticks,
+                        position_sec = position_sec,
+                        velocity = data2
+                    }
+                end
+            end
+        end
+    end
+end
+
+function init()
+    if not midi_file or midi_file == "" then
+        return
+    end
+
+    if obj.frame == 1 or not next(State.events) then
+        State.reset()
+
+        local file, err = io.open(midi_file, "rb")
+        if not file then
+            debug_print("[MIDI导入] 无法打开文件: " .. (err or midi_file))
+            return
+        end
+        local content = file:read("*a")
+        file:close()
+
+        parse_midi(content)
+
+        for track, items in pairs(State.events) do
+            if #items > 0 then
+                local min_p = items[1].pitch_shift
+                local max_p = items[1].pitch_shift
+                for _, item in ipairs(items) do
+                    local p = item.pitch_shift
+                    if p < min_p then min_p = p end
+                    if p > max_p then max_p = p end
+                end
+                if min_p == max_p then
+                    min_p = min_p - 1
+                    max_p = max_p + 1
+                end
+                State.track_meta[track] = {
+                    name = string.format("Track %d", track),
+                    min_pitch = min_p,
+                    max_pitch = max_p,
+                    item_count = #items
+                }
+            else
+                State.track_meta[track] = {
+                    name = string.format("Track %d", track),
+                    min_pitch = -12,
+                    max_pitch = 12,
+                    item_count = 0
+                }
+            end
+        end
+
+        local total = 0
+        for _, items in pairs(State.events) do
+            total = total + #items
+        end
+        debug_print(string.format("[MIDI导入] 解析完成 (共 %d 个事件)", total))
+    end
+
+    State.update(obj.time)
+end
+
+init()
