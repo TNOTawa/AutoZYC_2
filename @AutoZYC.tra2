@@ -289,17 +289,17 @@ local sandbox = {
 }
 
 -- Expression cache (file-level local)
-if not _expr_cache then _expr_cache = {} end
+if not AutoZYC_ExprCache then AutoZYC_ExprCache = {} end
 local cache_key = expression or ""
 
 local fn
-if _expr_cache[cache_key] then
-    fn = _expr_cache[cache_key]  -- cache hit
+if AutoZYC_ExprCache[cache_key] then
+    fn = AutoZYC_ExprCache[cache_key]  -- cache hit
 else
     -- Compile: load("return "..expr, "=expr", "t", sandbox)
     local ok, result = load("return " .. cache_key, "=expr", "t", sandbox)
     if ok then
-        _expr_cache[cache_key] = result
+        AutoZYC_ExprCache[cache_key] = result
         fn = result
     else
         debug_print("[表达式映射] 编译错误: " .. tostring(result))

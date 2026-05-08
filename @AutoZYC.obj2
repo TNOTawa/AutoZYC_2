@@ -359,6 +359,14 @@ function init()
             end
         end
 
+        AutoZYC_PitchRange = AutoZYC_PitchRange or {}
+        for track, meta in pairs(State.track_meta) do
+            AutoZYC_PitchRange[track] = {
+                minPitch = meta.min_pitch,
+                maxPitch = meta.max_pitch
+            }
+        end
+
         local total = 0
         for _, items in pairs(State.events) do
             total = total + #items
@@ -484,8 +492,10 @@ function parse_midi(content)
                     -- 没有有效的运行状态，跳过此字节
                     debug_print("[MIDI导入] 运行状态字节失效")
                     break
+                end
             else
                 pos = pos + 1
+                last_status = status
             end
 
             if status >= 0xF0 then
@@ -601,6 +611,14 @@ function init()
             end
         end
 
+        AutoZYC_PitchRange = AutoZYC_PitchRange or {}
+        for track, meta in pairs(State.track_meta) do
+            AutoZYC_PitchRange[track] = {
+                minPitch = meta.min_pitch,
+                maxPitch = meta.max_pitch
+            }
+        end
+
         local total = 0
         for _, items in pairs(State.events) do
             total = total + #items
@@ -679,20 +697,47 @@ end
 
 -- Calculate which item this frame aligns with
 local current_time_ms = obj.time * 1000
+local current_item = nil
+local current_idx = 0
 for idx, item in ipairs(items) do
     local start_ms = item.position_ms
     local end_ms = start_ms + item.length_ms
 
     if current_time_ms >= start_ms and current_time_ms < end_ms then
-        -- Position object at this item's time-aligned position
-        -- Use obj.effect() to apply transformations
-        local pitch = item.pitch_shift or 0
-        local velocity = item.velocity or 100
-
-        -- Store current item info for other scripts
-        -- (compatible with existing @效果 and @缓动 expectations)
+        current_item = item
+        current_idx = idx
         break
     end
+end
+
+if current_item then
+    -- Position object at this item's time-aligned position
+    -- Map event position to object position using obj.effect()
+    local pitch = current_item.pitch_shift or 0
+    local velocity = current_item.velocity or 100
+    local progress = (current_time_ms - current_item.position_ms) / (current_item.length_ms or 1)
+
+    -- Set object x-position proportional to event timeline progress
+    -- (obj.ox, obj.oy are object position in Aviutl2 coordinate space)
+    obj.ox = obj.ox or 0
+    obj.oy = obj.oy or 0
+
+    -- Apply pitch-driven horizontal offset via obj.effect()
+    -- This makes the object respond to audio pitch like v1.1 @音高驱动位置
+    local pitch_offset = pitch * 5  -- 5 pixels per semitone
+    obj.ox = obj.ox + pitch_offset
+
+    -- Store current item info for other scripts to read
+    -- Compatible with existing @效果 and @缓动 expectations
+    AutoZYC_CurrentEvent = {
+        track = track,
+        index = current_idx,
+        pitch_shift = pitch,
+        velocity = velocity,
+        position_ms = current_item.position_ms,
+        length_ms = current_item.length_ms,
+        progress = math.max(0, math.min(1, progress))
+    }
 end
 
 -- ============================================================
