@@ -31,6 +31,13 @@ Module layer (.mod2 C++):         obj.module("AutoZYCParse") — RPP/MIDI parsin
 Plugin layer (.aux2 C++):         Independent DLL — object generation, menus, config persistence
 ```
 
+## SUB-AGENTS
+
+| Directory | Content |
+|-----------|---------|
+| [script/](script/AGENTS.md) | LuaJIT @multi-script conventions, section patterns, anti-patterns |
+| [native/](native/AGENTS.md) | C++ build system, .mod2/.aux2 APIs, g++ flags |
+
 ## WHERE TO LOOK
 
 | Task | File | Section |
@@ -45,6 +52,7 @@ Plugin layer (.aux2 C++):         Independent DLL — object generation, menus, 
 | Pixel shaders | script/@AutoZYC.anm2 | @色相映射, @亮度映射 |
 | .mod2 source | native/AutoZYCParse/AutoZYCParse.cpp | C++17 |
 | .aux2 source | native/AutoZYC/AutoZYC.cpp | C++17 |
+| E2E tests | script/test/@AutoZYC_test.obj2 | 6 test sections |
 | Aviutl2 Lua API | aviutl2_sdk/docs/lua.txt | obj.* functions |
 
 ## .mod2 API (REQUIRED DEPENDENCY)
