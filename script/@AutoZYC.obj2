@@ -132,60 +132,72 @@ function State.get_setting(idx)
     return State.settings[idx]
 end
 
+-- 从 .mod2 模块加载事件数据到 State
+function State.load_from_mod2(mod, event_type)
+    local track_count = mod.get_track_count()
+    for track = 1, track_count do
+        local count = mod.get_event_count(track)
+        if count and count > 0 then
+            local data = mod.get_event_data(track)
+            for i = 1, #data, 4 do
+                State.add_event(track, {
+                    position_sec = data[i],
+                    length_sec = data[i+1],
+                    position_ms = sec_to_ms(data[i]),
+                    length_ms = sec_to_ms(data[i+1]),
+                    pitch_shift = data[i+2],
+                    velocity = data[i+3],
+                    track = track,
+                    event_type = event_type or "audio"
+                })
+            end
+        end
+
+        local meta = mod.get_track_meta(track)
+        if meta then
+            State.track_meta[track] = {
+                name = string.format("Track %d", track),
+                min_pitch = meta.min_pitch or -12,
+                max_pitch = meta.max_pitch or 12,
+                item_count = meta.item_count or 0
+            }
+        end
+    end
+end
+
 State_init()
 
 -- ============================================================
--- RPP导入 (使用 .mod2 解析)
+-- 数据导入 (统一 RPP/MIDI 解析)
 -- ============================================================
 
-@RPP导入
---file@rpp_file:RPP文件
+@数据导入
+--file@data_file:数据文件(RPP/MIDI)
+--select@file_type:文件类型,自动检测=0,RPP文件=1,MIDI文件=2
 --require:2004300
---label:AutoZYC\RPP导入
+--label:AutoZYC\数据导入
 
 function init()
-    if not rpp_file or rpp_file == "" then return end
+    if not data_file or data_file == "" then return end
 
     if obj.frame == 1 or not next(State.events) then
         State.reset()
 
         local mod = obj.module("AutoZYCParse")
-        local ok, err = pcall(mod.parse_file, rpp_file)
+        local ok, err = pcall(mod.parse_file, data_file)
         if not ok then
-            debug_print("[RPP导入] 解析失败: " .. tostring(err))
+            debug_print("[数据导入] 解析失败: " .. tostring(err))
             return
         end
 
-        -- Read events from .mod2 into State
-        local track_count = mod.get_track_count()
-        for track = 1, track_count do
-            local count = mod.get_event_count(track)
-            if count > 0 then
-                local data = mod.get_event_data(track)
-                -- data = {pos1, len1, pitch1, vel1, pos2, ...}
-                for i = 1, #data, 4 do
-                    State.add_event(track, {
-                        position_sec = data[i],
-                        length_sec = data[i+1],
-                        position_ms = sec_to_ms(data[i]),
-                        length_ms = sec_to_ms(data[i+1]),
-                        pitch_shift = data[i+2],
-                        velocity = data[i+3],
-                        track = track,
-                        event_type = "audio"
-                    })
-                end
-            end
-
-            -- Read track metadata from .mod2
-            local meta = mod.get_track_meta(track)
-            State.track_meta[track] = {
-                name = string.format("Track %d", track),
-                min_pitch = meta.min_pitch,
-                max_pitch = meta.max_pitch,
-                item_count = meta.item_count
-            }
+        -- Auto-detect type from extension (or use file_type parameter)
+        local ext = data_file:lower()
+        local event_type = "audio"
+        if file_type == 2 or ext:match("%.mid$") or ext:match("%.midi$") or ext:match("%.smf$") then
+            event_type = "midi"
         end
+
+        State.load_from_mod2(mod, event_type)
 
         -- Backward compat: AutoZYC_PitchRange
         AutoZYC_PitchRange = AutoZYC_PitchRange or {}
@@ -200,81 +212,7 @@ function init()
         for _, items in pairs(State.events) do
             total = total + #items
         end
-        debug_print(string.format("[RPP导入] 解析完成 (共 %d 个事件)", total))
-    end
-
-    State.update(obj.time)
-end
-
-init()
-
--- ============================================================
--- MIDI导入 (使用 .mod2 解析)
--- ============================================================
-
-@MIDI导入
---file@midi_file:MIDI文件
---require:2004300
---label:AutoZYC\MIDI导入
-
-function init()
-    if not midi_file or midi_file == "" then return end
-
-    if obj.frame == 1 or not next(State.events) then
-        State.reset()
-
-        local mod = obj.module("AutoZYCParse")
-        local ok, err = pcall(mod.parse_file, midi_file)
-        if not ok then
-            debug_print("[MIDI导入] 解析失败: " .. tostring(err))
-            return
-        end
-
-        -- Read events from .mod2 into State
-        local track_count = mod.get_track_count()
-        for track = 1, track_count do
-            local count = mod.get_event_count(track)
-            if count > 0 then
-                local data = mod.get_event_data(track)
-                -- data = {pos1, len1, pitch1, vel1, pos2, ...}
-                for i = 1, #data, 4 do
-                    State.add_event(track, {
-                        position_sec = data[i],
-                        length_sec = data[i+1],
-                        position_ms = sec_to_ms(data[i]),
-                        length_ms = sec_to_ms(data[i+1]),
-                        pitch_shift = data[i+2],
-                        velocity = data[i+3],
-                        track = track,
-                        event_type = "midi"
-                    })
-                end
-            end
-
-            -- Read track metadata from .mod2
-            local meta = mod.get_track_meta(track)
-            State.track_meta[track] = {
-                name = string.format("Track %d", track),
-                min_pitch = meta.min_pitch,
-                max_pitch = meta.max_pitch,
-                item_count = meta.item_count
-            }
-        end
-
-        -- Backward compat: AutoZYC_PitchRange
-        AutoZYC_PitchRange = AutoZYC_PitchRange or {}
-        for track, meta in pairs(State.track_meta) do
-            AutoZYC_PitchRange[track] = {
-                minPitch = meta.min_pitch,
-                maxPitch = meta.max_pitch
-            }
-        end
-
-        local total = 0
-        for _, items in pairs(State.events) do
-            total = total + #items
-        end
-        debug_print(string.format("[MIDI导入] 解析完成 (共 %d 个事件)", total))
+        debug_print(string.format("[数据导入] 解析完成 (共 %d 个事件, 类型=%s)", total, event_type))
     end
 
     State.update(obj.time)
@@ -418,4 +356,3 @@ AutoZYC_EaseSettings[ei] = {
     trackIndex = ti,
     duration = du
 }
-

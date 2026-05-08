@@ -1,4 +1,4 @@
-//----------------------------------------------------------------------------------
+﻿//----------------------------------------------------------------------------------
 //  AutoZYCParse.mod2 — RPP/MIDI 解析加速 + 表达式求值模块
 //  For AviUtl ExEdit2 (x64)
 //----------------------------------------------------------------------------------
@@ -12,6 +12,8 @@
 #include <cmath>
 #include <cctype>
 #include <cstdint>
+#include <sstream>
+#include <map>
 
 #include "aviutl2_sdk/module2.h"
 
@@ -97,6 +99,66 @@ static void add_event(int track, const Event& evt) {
     g_events[track].push_back(evt);
 }
 
+struct RppMidiPending {
+    unsigned int offset;
+    double pos_sec;
+    unsigned int vel;
+};
+
+static void parse_rpp_midi(const std::string& content, int track_num, double base_offset) {
+    int ticks_per_qn = 960;
+    double tempo_us = 500000.0;
+
+    std::istringstream ss(content);
+    std::string line;
+    std::map<int, RppMidiPending> pending;
+
+    while (std::getline(ss, line)) {
+        line = trim(line);
+        if (line.find("HASDATA ") == 0) {
+            ticks_per_qn = atoi(line.c_str() + 8);
+            if (ticks_per_qn <= 0) ticks_per_qn = 960;
+        }
+        else if (!line.empty() && line[0] == 'e' && line[1] == ' ') {
+            unsigned int off = 0, fl = 0, n = 0, v = 0;
+            sscanf(line.c_str(), "e %x %x %x %x", &off, &fl, &n, &v);
+            double tick_dur = tempo_us / 1000000.0 / ticks_per_qn;
+            double pos = base_offset + off * tick_dur;
+
+            if (fl == 0x90 && v > 0) {
+                pending[n] = {off, pos, v};
+            }
+            else if (fl == 0x80 || (fl == 0x90 && v == 0)) {
+                auto it = pending.find(n);
+                if (it != pending.end()) {
+                    double len = (off - it->second.offset) * tick_dur;
+                    Event evt = {};
+                    evt.position_sec = it->second.pos_sec;
+                    evt.length_sec = len;
+                    evt.pitch_shift = (double)n - 69.0;
+                    evt.velocity = (double)it->second.vel;
+                    evt.track = track_num;
+                    evt.event_type = 1;
+                    add_event(track_num, evt);
+                    pending.erase(it);
+                }
+            }
+        }
+    }
+    // 剩余未结束的音符使用默认 0.5 秒长度
+    double tick_dur = tempo_us / 1000000.0 / ticks_per_qn;
+    for (auto& p : pending) {
+        Event evt = {};
+        evt.position_sec = p.second.pos_sec;
+        evt.length_sec = 0.5;
+        evt.pitch_shift = (double)p.first - 69.0;
+        evt.velocity = (double)p.second.vel;
+        evt.track = track_num;
+        evt.event_type = 1;
+        add_event(track_num, evt);
+    }
+}
+
 static void parse_rpp(const std::string& content) {
     g_track_count = 0;
     int current_track = 0;
@@ -126,6 +188,23 @@ static void parse_rpp(const std::string& content) {
                 pos = next_end + 1;
                 if (!inner.empty() && inner.back() == '\r') inner.pop_back();
                 inner = trim(inner);
+                if (starts_with(inner, "<SOURCE MIDI")) {
+                    std::string midi_content;
+                    int midi_nest = 1;
+                    while (pos < content.size()) {
+                        size_t mend = content.find('\n', pos);
+                        if (mend == std::string::npos) mend = content.size();
+                        std::string mline = content.substr(pos, mend - pos);
+                        pos = mend + 1;
+                        if (!mline.empty() && mline.back() == '\r') mline.pop_back();
+                        midi_content += mline + "\n";
+                        std::string mt = trim(mline);
+                        if (starts_with(mt, "<")) midi_nest++;
+                        if (mt == ">") { midi_nest--; if (midi_nest <= 0) break; }
+                    }
+                    parse_rpp_midi(midi_content, current_track, evt.position_sec);
+                    continue;
+                }
                 if (starts_with(inner, "<")) { depth++; }
                 if (inner == ">") { depth--; if (depth <= 0) break; continue; }
                 if (starts_with(inner, "POSITION")) {
