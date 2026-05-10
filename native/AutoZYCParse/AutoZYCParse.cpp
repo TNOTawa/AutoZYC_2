@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
 //  AutoZYCParse.mod2 — RPP/MIDI 解析加速 + 表达式求值模块
 //  For AviUtl ExEdit2 (x64)
 //----------------------------------------------------------------------------------
@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cstdint>
 #include <sstream>
+#include <algorithm>
 #include <map>
 
 #include "aviutl2_sdk/module2.h"
@@ -658,6 +659,50 @@ static void eval_expression(SCRIPT_MODULE_PARAM* param) {
     param->push_result_double(parser.get_result());
 }
 
+
+static void get_current_item(SCRIPT_MODULE_PARAM* param) {
+    int track = param->get_param_int(0);
+    double time_sec = param->get_param_double(1);
+    
+    auto it = g_events.find(track);
+    if (it == g_events.end() || it->second.empty()) {
+        double zeros[6] = {0, 0, 0, 0, 0, 0};
+        param->push_result_array_double(zeros, 6);
+        return;
+    }
+    
+    auto& events = it->second;
+    
+    // Binary search: find first event with position_sec > time_sec
+    // Events are sorted by position_sec (guaranteed by add_event() order)
+    auto bound = std::lower_bound(events.begin(), events.end(), time_sec,
+        [](const Event& e, double t) { return e.position_sec <= t; });
+    
+    // count = number of events with position_sec <= time_sec
+    int count = (int)(bound - events.begin());
+    
+    double is_playing = 0.0;
+    double position_sec = 0.0;
+    double length_sec = 0.0;
+    double pitch_shift = 0.0;
+    double velocity = 0.0;
+    
+    if (count > 0) {
+        auto& active = events[count - 1];
+        double end_sec = active.position_sec + active.length_sec;
+        if (time_sec >= active.position_sec && time_sec < end_sec) {
+            is_playing = 1.0;
+            position_sec = active.position_sec;
+            length_sec = active.length_sec;
+            pitch_shift = active.pitch_shift;
+            velocity = active.velocity;
+        }
+    }
+    
+    double result[6] = { (double)count, is_playing, position_sec, length_sec, pitch_shift, velocity };
+    param->push_result_array_double(result, 6);
+}
+
 // Module table and exports
 static SCRIPT_MODULE_FUNCTION g_functions[] = {
     { L"parse_file", parse_file },
@@ -666,6 +711,7 @@ static SCRIPT_MODULE_FUNCTION g_functions[] = {
     { L"get_event_data", get_event_data },
     { L"get_track_meta", get_track_meta },
     { L"eval_expression", eval_expression },
+    { L"get_current_item", get_current_item },
     { nullptr, nullptr }
 };
 
