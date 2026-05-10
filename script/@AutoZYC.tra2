@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- AutoZYC v2.0 - 统一缓动函数库
 -- ============================================================
 
@@ -10,63 +10,9 @@
 -- Ease.easeOutElastic(0) == 0, Ease.easeOutElastic(1) == 1
 -- All functions t=0 => 0, t=1 => 1
 -- (future sections will go here in Wave 2)
-@线性运动
---twopoint
---speed:0,0
---param:1
---accelerate
---decelerate
---require:2004300
---label:AutoZYC\线性运动
-
-local s = obj.getpoint(0)
-local e = obj.getpoint(1)
-
--- v1.1 compatible ease setting loading
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
-local duration_sec = math.max(0.01, ease_settings[easeIndex] and ease_settings[easeIndex].duration or 1)
-local duration_ms = duration_sec * 1000
-
--- Use Ease library from preamble instead of hardcoded functions
-local acc = obj.getpoint("accelerate")
-local dec = obj.getpoint("decelerate")
-local ease = Ease.select(acc, dec)
-
--- v1.1 compatible counter data access
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
--- Same logic as v1.1 lines 29-76
-if not track_data or not track_data.exists then
-    return e
-end
-
-local current_time_ms = (AutoZYC_GlobalAudioTime or 0) * 1000
-local item_start_ms = track_data.position_ms
-local item_length_ms = track_data.length_ms
-
-if item_length_ms <= 0 then
-    return e
-end
-
-local anim_duration_ms = math.min(item_length_ms, duration_ms)
-local anim_end_ms = item_start_ms + anim_duration_ms
-
-if current_time_ms >= anim_end_ms then
-    return e
-end
-
-local elapsed_ms = current_time_ms - item_start_ms
-local progress = math.min(elapsed_ms / anim_duration_ms, 1.0)
-local t = ease(progress)
-
-return s + (e - s) * t
-
 @视频播放控制
 --twopoint
---param:1
+--param:轨道,0
 --require:2004300
 --label:AutoZYC\视频播放控制
 
@@ -74,28 +20,29 @@ local video_start = obj.getpoint(0)
 local video_end   = obj.getpoint(1)
 local video_duration = video_end - video_start
 
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
+-- 读取轨道设置
+local track_param = obj.getpoint("param") or 0
 
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
-if not track_data or not track_data.exists then
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
     return video_start
 end
 
-local current_time_ms = (AutoZYC_GlobalAudioTime or 0) * 1000
+local track_data = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return video_start
+end
+
+local current_time_ms = State.get_audio_time() * 1000
 local item_start_ms = track_data.position_ms
 local elapsed_ms = current_time_ms - item_start_ms
-local elapsed_sec = elapsed_ms / 1000
+local elapsed_sec = math.min(elapsed_ms / 1000, video_duration)
 
 if elapsed_sec <= 0 then
     return video_start
-end
-
-if elapsed_sec >= video_duration then
-    return video_end
 end
 
 return video_start + elapsed_sec
@@ -104,21 +51,32 @@ return video_start + elapsed_sec
 --twopoint
 --accelerate
 --decelerate
---param:1
+--param:轨道,0
 --require:2004300
 --label:AutoZYC\音高驱动位置
 
 local s = obj.getpoint(0)  -- position at min pitch
 local e = obj.getpoint(1)  -- position at max pitch
 
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local settings = ease_settings[easeIndex]
-local trackIndex = settings and settings.trackIndex or 1
+-- 读取轨道设置
+local track_param = obj.getpoint("param") or 0
 
--- Get pitch range from AutoZYC_PitchRange
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" then
+    return s
+end
+
+local track_data, active_track = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return s
+end
+
+-- Get pitch range for the active track
 local pitch_range = AutoZYC_PitchRange or {}
-local range = pitch_range[trackIndex]
+local range = pitch_range[active_track > 0 and active_track or 1]
 local minPitch = range and range.minPitch or -12
 local maxPitch = range and range.maxPitch or 12
 
@@ -131,11 +89,17 @@ local acc = obj.getpoint("accelerate")
 local dec = obj.getpoint("decelerate")
 local ease = Ease.select(acc, dec)
 
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
-if not track_data or not track_data.exists then
-    return s
+-- 间隙：保持上一帧音高位置
+AutoZYC_PitchLastPos = AutoZYC_PitchLastPos or {}
+local pk = track_param > 0 and track_param or active_track
+if not track_data.exists then
+    local last_pos = AutoZYC_PitchLastPos[pk]
+    if last_pos then
+        return last_pos
+    end
+    local pitch = track_data.pitch_shift or 0
+    local t = math.max(0, math.min(1, (pitch - minPitch) / (maxPitch - minPitch)))
+    return s + (e - s) * ease(t)
 end
 
 local current_pitch = track_data.pitch_shift
@@ -146,134 +110,270 @@ t_norm = math.max(0, math.min(1, t_norm))
 
 -- Apply easing and map to [s, e]
 local t_eased = ease(t_norm)
-return s + (e - s) * t_eased
+local current_pos = s + (e - s) * t_eased
+AutoZYC_PitchLastPos[pk] = current_pos
+return current_pos
 
-@力度驱动透明度
---value@minAlpha:最小不透明度,0.2
---param:1
+@节奏时间控制
+--information:节奏时间控制循环 AutoZYC v2.0
+--label:AutoZYC\节奏控制
 --require:2004300
---label:AutoZYC\力度驱动透明度
-
-local min_alpha = math.max(0, math.min(1, minAlpha or 0.2))
-
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
-
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
-if not track_data or not track_data.exists then
-    return 1.0  -- no MIDI data, full alpha
-end
-
-local velocity = track_data.velocity or 100
--- Map velocity 0-127 → min_alpha-1.0
-local alpha = min_alpha + (velocity / 127) * (1.0 - min_alpha)
-return math.max(0, math.min(1, alpha))
-
-@表达式映射
 --twopoint
---param:1
---accelerate
---decelerate
---value@expression:缓动表达式,pitch / 12 * 50
---require:2004300
---label:AutoZYC\表达式映射
+--timecontrol
+--param:轨道,0
+--param:周期(秒),0
+
+local obj, math = obj, math;
 
 local s = obj.getpoint(0)
 local e = obj.getpoint(1)
 
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
+-- 读取轨道设置
+local track_param, time_len = obj.getpoint("param")
+track_param = track_param or 0
+time_len = time_len or 0
 
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
+    return s
+end
+
+local track_data = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return s
+end
+
+local note_length_sec = track_data.length_ms / 1000
+if note_length_sec <= 0 then
+    return e  -- 间隙：停在目标点
+end
+
+-- 计算有效周期
+local effective_period
+if time_len > 0 then
+    effective_period = time_len
+elseif time_len < 0 then
+    effective_period = math.abs(time_len) * note_length_sec
+else
+    effective_period = note_length_sec
+end
+if effective_period <= 0 then
+    return s
+end
+
+-- 计算经过时间
+local note_start_sec = track_data.position_ms / 1000
+local elapsed_in_note = State.get_audio_time() - note_start_sec
+
+-- 相位：到达目标后停止
+elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
+local phase = math.min(elapsed_in_note / effective_period, 1.0)
+
+-- 评估时间控制曲线 (映射到物件全长)
+local object_duration = obj.getpoint("time", 1)
+local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
+return s + (e - s) * curve_t
+
+@节奏时间控制往复
+--information:节奏时间控制循环往复 AutoZYC v2.0
+--label:AutoZYC\节奏控制
+--require:2004300
+--twopoint
+--timecontrol
+--param:轨道,0
+--param:周期(秒),0
+
+local obj, math = obj, math;
+
+local s = obj.getpoint(0)
+local e = obj.getpoint(1)
+
+-- 读取轨道设置
+local track_param, time_len = obj.getpoint("param")
+track_param = track_param or 0
+time_len = time_len or 0
+
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
+    return s
+end
+
+local track_data = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return s
+end
+
+local note_length_sec = track_data.length_ms / 1000
+if note_length_sec <= 0 then
+    local ni = track_data.count or 0
+    if ni % 2 == 0 then return s else return e end
+end
+
+-- 计算有效周期
+local effective_period
+if time_len > 0 then
+    effective_period = time_len
+elseif time_len < 0 then
+    effective_period = math.abs(time_len) * note_length_sec
+else
+    effective_period = note_length_sec
+end
+if effective_period <= 0 then
+    return s
+end
+
+-- 计算经过时间
+local note_start_sec = track_data.position_ms / 1000
+local elapsed_in_note = State.get_audio_time() - note_start_sec
+
+-- 相位：到达目标后停止
+elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
+local phase = math.min(elapsed_in_note / effective_period, 1.0)
+
+-- 往復模式：按音符序号切换方向 (类@常用效果 镜像反转)
+local v0, v1 = s, e
+local note_index = track_data.count or 0
+if note_index % 2 == 0 then
+    v0, v1 = e, s
+end
+
+-- 评估时间控制曲线 (映射到物件全长)
+local object_duration = obj.getpoint("time", 1)
+local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
+return v0 + (v1 - v0) * curve_t
+
+@节奏时间控制镜像往复
+--information:节奏时间控制镜像往复 AutoZYC v2.0
+--label:AutoZYC\节奏控制
+--require:2004300
+--twopoint
+--timecontrol
+--param:轨道,0
+--param:周期(秒),0
+
+local obj, math = obj, math;
+
+local s = obj.getpoint(0)
+local e = obj.getpoint(1)
+
+-- 读取轨道设置
+local track_param, time_len = obj.getpoint("param")
+track_param = track_param or 0
+time_len = time_len or 0
+
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
+    return s
+end
+
+local track_data = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return s
+end
+
+local note_length_sec = track_data.length_ms / 1000
+if note_length_sec <= 0 then
+    return e  -- 镜像往复 gap：停到 e
+end
+
+-- 计算有效周期
+local effective_period
+if time_len > 0 then
+    effective_period = time_len
+elseif time_len < 0 then
+    effective_period = math.abs(time_len) * note_length_sec
+else
+    effective_period = note_length_sec
+end
+if effective_period <= 0 then
+    return s
+end
+
+-- 计算经过时间
+local note_start_sec = track_data.position_ms / 1000
+local elapsed_in_note = State.get_audio_time() - note_start_sec
+
+-- 相位：到达目标后停止
+elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
+local phase = math.min(elapsed_in_note / effective_period, 1.0)
+
+-- 镜像往復模式：按音符序号切换方向
+local v0, v1 = s, e
+local note_index = track_data.count or 0
+if note_index % 2 == 0 then
+    v0 = -s
+    v1 = e
+end
+
+-- 评估时间控制曲线 (映射到物件全长)
+local object_duration = obj.getpoint("time", 1)
+local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
+return v0 + (v1 - v0) * curve_t
+
+@音高驱动位置时间控制
+--information:音高驱动位置时间控制 AutoZYC v2.0
+--label:AutoZYC\音高时间控制
+--require:2004300
+--twopoint
+--timecontrol
+--accelerate
+--decelerate
+--param:轨道,0
+--param:周期(秒),0
+
+local obj, math = obj, math;
+
+local s = obj.getpoint(0)
+local e = obj.getpoint(1)
+
+-- 读取轨道设置
+local track_param, time_len = obj.getpoint("param")
+track_param = track_param or 0
+time_len = time_len or 0
+
+-- 使用 State 方法读取轨道数据
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
+    return s
+end
+
+local track_data, active_track = State.find_active_track({}, track_param)
+
+-- 防护：完全无数据
+if not track_data then
+    return s
+end
+
+-- Get pitch range for the active track
+local pitch_range = AutoZYC_PitchRange or {}
+local range = pitch_range[active_track > 0 and active_track or 1]
+local minPitch = range and range.minPitch or -12
+local maxPitch = range and range.maxPitch or 12
+
+if minPitch >= maxPitch then
+    maxPitch = minPitch + 0.01
+end
+
+-- Use Ease library
 local acc = obj.getpoint("accelerate")
 local dec = obj.getpoint("decelerate")
 local ease = Ease.select(acc, dec)
 
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
-local pitch = track_data and track_data.pitch_shift or 0
-local velocity = track_data and track_data.velocity or 100
-local time = AutoZYC_GlobalAudioTime or 0
-local idx = track_data and track_data.count or 0
-
-local mod = obj.module("AutoZYCParse")
-local ok, result = pcall(mod.eval_expression, expression or "", pitch, velocity, time, idx, trackIndex)
-if not ok then
-    debug_print("[表达式映射] 求值错误: " .. tostring(result))
-    return s
-end
-
-local t_norm = tonumber(result) or 0
-t_norm = math.max(0, math.min(1, t_norm))
-local t_eased = ease(t_norm)
-return s + (e - s) * t_eased
-
-@BPM同步缓动
---twopoint
---value@bpm:BPM值,120
---param:1
---require:2004300
---label:AutoZYC\BPM同步缓动
-
-local s = obj.getpoint(0)
-local e = obj.getpoint(1)
-
-local bpm = math.max(1, tonumber(BPM) or 120)
-local period_sec = 60 / bpm
-
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
-
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
-if not track_data or not track_data.exists then
-    return s
-end
-
--- Calculate phase within BPM period
-local current_time = AutoZYC_GlobalAudioTime or 0
-local phase = (current_time % period_sec) / period_sec  -- [0, 1)
-
--- Map phase to easing curve
-local t_eased = Ease.easeInOutQuad(phase)
-return s + (e - s) * t_eased
-
-@音乐时间控制
---information:音乐时间控制循环 AutoZYC v2.0
---label:AutoZYC\音乐控制
---require:2004300
---twopoint
---timecontrol
---param:1
---value@time_length:周期控制,0
-
-local obj, math = obj, math;
-
-local s = obj.getpoint(0)
-local e = obj.getpoint(1)
-
--- 读取缓动设置
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
-local time_len = obj.getpoint("time_length") or 0
-
--- 读取音符数据
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
--- 防护：不在音符上
-if not track_data or not track_data.exists then
-    return s
-end
-
 local note_length_sec = track_data.length_ms / 1000
+if note_length_sec <= 0 then
+    local p = track_data.pitch_shift or 0
+    local pn = math.max(0, math.min(1, (p - minPitch) / (maxPitch - minPitch)))
+    return s + (e - s) * ease(pn)
+end
 
 -- 计算有效周期
 local effective_period
@@ -284,92 +384,30 @@ elseif time_len < 0 then
 else
     effective_period = note_length_sec
 end
-
--- 防护：零周期
 if effective_period <= 0 then
     return s
 end
 
--- 钳位到对象时长
-local object_duration = obj.getpoint("time", 1)
-effective_period = math.min(effective_period, object_duration)
-
--- 计算音符内经过时间
-local current_time = AutoZYC_GlobalAudioTime or 0
+-- 计算经过时间
 local note_start_sec = track_data.position_ms / 1000
-local elapsed_in_note = current_time - note_start_sec
+local elapsed_in_note = State.get_audio_time() - note_start_sec
+elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
 
--- 相位 [0, 1)
-local phase = (elapsed_in_note / note_length_sec) % 1
+-- 相位：到达目标后停止
+local phase = math.min(elapsed_in_note / effective_period, 1.0)
 
--- 评估时间控制曲线
-local curve_t = obj.getpoint("timecontrol", "value", phase * effective_period)
-return s + (e - s) * curve_t
+-- 目标位置：根据当前音高计算
+local current_pitch = track_data.pitch_shift or 0
+local pitch_norm = (current_pitch - minPitch) / (maxPitch - minPitch)
+pitch_norm = math.max(0, math.min(1, pitch_norm))
+local target = s + (e - s) * ease(pitch_norm)
+-- 起点为上一帧终点
+AutoZYC_PitchPrevTarget = AutoZYC_PitchPrevTarget or {}
+local track_key = track_param > 0 and track_param or active_track
+local start_pos = AutoZYC_PitchPrevTarget[track_key] or s
+AutoZYC_PitchPrevTarget[track_key] = target
 
-@音乐时间控制往復
---information:音乐时间控制循环往復 AutoZYC v2.0
---label:AutoZYC\音乐控制往復
---require:2004300
---twopoint
---timecontrol
---param:1
---value@time_length:周期控制,0
-
-local obj, math = obj, math;
-
-local s = obj.getpoint(0)
-local e = obj.getpoint(1)
-
--- 读取缓动设置
-local ease_settings = AutoZYC_EaseSettings or {}
-local easeIndex = obj.getpoint("param") or 1
-local trackIndex = ease_settings[easeIndex] and ease_settings[easeIndex].trackIndex or 1
-local time_len = obj.getpoint("time_length") or 0
-
--- 读取音符数据
-local counter_data = AutoZYC_Item_count or {}
-local track_data = counter_data[trackIndex]
-
--- 防护：不在音符上
-if not track_data or not track_data.exists then
-    return s
-end
-
-local note_length_sec = track_data.length_ms / 1000
-
--- 计算有效周期
-local effective_period
-if time_len > 0 then
-    effective_period = time_len
-elseif time_len < 0 then
-    effective_period = math.abs(time_len) * note_length_sec
-else
-    effective_period = note_length_sec
-end
-
--- 防护：零周期
-if effective_period <= 0 then
-    return s
-end
-
--- 钳位到对象时长
+-- 评估时间控制曲线 (映射到物件全长)
 local object_duration = obj.getpoint("time", 1)
-effective_period = math.min(effective_period, object_duration)
-
--- 计算音符内经过时间
-local current_time = AutoZYC_GlobalAudioTime or 0
-local note_start_sec = track_data.position_ms / 1000
-local elapsed_in_note = current_time - note_start_sec
-
--- 相位 [0, 1)
-local phase = (elapsed_in_note / note_length_sec) % 1
-
--- 往返模式：相位 x2 → [0, 2)
-local x = 2 * phase
-local v0, v1 = s, e
-if x >= 1 then
-    v0, v1 = e, s
-    x = x - 1
-end
-local curve_t = obj.getpoint("timecontrol", "value", x * effective_period)
-return v0 + (v1 - v0) * curve_t
+local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
+return start_pos + (target - start_pos) * curve_t
