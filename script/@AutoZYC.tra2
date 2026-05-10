@@ -11,6 +11,50 @@
 -- All functions t=0 => 0, t=1 => 1
 -- (future sections will go here in Wave 2)
 
+@视频播放控制
+--twopoint
+--value@track:指定轨道,0
+--value@video_offset:视频偏移(秒),0
+--value@playback_speed:播放速度,1
+--value@timing_offset:卡点偏移(秒),0
+--check@pause_on_silence:在音符停止时停止播放,0
+--require:2004300
+--label:AutoZYC\视频播放控制
+
+local obj, math = obj, math;
+local video_start = obj.getpoint(0)
+local video_end   = obj.getpoint(1)
+local video_duration = video_end - video_start
+
+local track_param = obj.getpoint("track") or 0
+local video_offset = obj.getpoint("video_offset") or 0
+local playback_speed = obj.getpoint("playback_speed") or 1
+local timing_offset = obj.getpoint("timing_offset") or 0
+local pause_on_silence = obj.getpoint("pause_on_silence") or 0
+
+local State = AutoZYC_State or {}
+if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
+    return video_start
+end
+
+local track_data = State.find_active_track({}, track_param)
+if not track_data then
+    return video_start
+end
+
+-- 在音符停止时停止播放（停留在当前帧）
+if not track_data.exists and pause_on_silence == 1 then
+    return video_start
+end
+
+local audio_time_sec = State.get_audio_time()
+local note_start_sec = track_data.position_ms / 1000
+local elapsed_sec = video_offset + (audio_time_sec - note_start_sec - timing_offset) * playback_speed
+local clamped_sec = math.min(math.max(elapsed_sec, 0), video_duration)
+
+return video_start + clamped_sec
+
+
 @音高驱动位置
 --twopoint
 --accelerate
