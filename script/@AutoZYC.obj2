@@ -258,40 +258,6 @@ function Ease.select(acc, dec)
     end
 end
 
-@视频播放控制
---file@video_file:视频文件
---value@track:指定轨道,0
---check@pause_on_silence:在音符停止时停止播放,0
---value@timing_offset:卡点偏移(秒),0
---require:2004300
---label:AutoZYC\视频播放控制
-
-local obj, math = obj, math;
-local State = AutoZYC_State or {}
-if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
-    return
-end
-if not video_file or video_file == "" then return end
-
-local track_param = tonumber(track) or 0
-local pause_on_silence = tonumber(pause_on_silence) or 0
-local timing_offset = tonumber(timing_offset) or 0
-
-local track_data = State.find_active_track({}, track_param)
-if not track_data then return end
-
-local current_time_sec = State.get_audio_time() - timing_offset
-local note_start_sec = track_data.position_ms / 1000
-local elapsed_sec = current_time_sec - note_start_sec
-
--- 在音符停止时停止播放（停留在当前帧）
-if not track_data.exists and pause_on_silence == 1 then
-    return
-end
-
--- Seek video to calculated position
-local target_sec = math.max(0, elapsed_sec)
-obj.load("movie", video_file, target_sec)
 
 function init()
     if not data_file or data_file == "" then return end
