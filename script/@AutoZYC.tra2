@@ -1,5 +1,5 @@
--- ============================================================
--- AutoZYC v2.0 - 统一缓动函数库
+﻿-- ============================================================
+-- AutoZYC v2.0 - 缁熶竴缂撳姩鍑芥暟搴?
 -- ============================================================
 
 
@@ -10,70 +10,21 @@
 -- Ease.easeOutElastic(0) == 0, Ease.easeOutElastic(1) == 1
 -- All functions t=0 => 0, t=1 => 1
 -- (future sections will go here in Wave 2)
-@视频播放控制
---twopoint
---param:轨道,0
---check@pause_on_silence:在音符停止时停止播放,0
---value@timing_offset:卡点偏移(秒),0
---require:2004300
---label:AutoZYC\视频播放控制
-
-local video_start = obj.getpoint(0)
-local video_end   = obj.getpoint(1)
-local video_duration = video_end - video_start
-
--- 读取轨道设置
-local track_param = obj.getpoint("param") or 0
-local pause_on_silence = obj.getpoint("pause_on_silence") or 0
-local timing_offset = obj.getpoint("timing_offset") or 0
-
--- 使用 State 方法读取轨道数据
-local State = AutoZYC_State or {}
-if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
-    return video_start
-end
-
-local track_data = State.find_active_track({}, track_param)
-
--- 防护：完全无数据
-if not track_data then
-    return video_start
-end
-
--- 应用卡点偏移
-local current_time_ms = (State.get_audio_time() - timing_offset) * 1000
-local item_start_ms = track_data.position_ms
-
--- 在音符停止时停止播放（停留在当前帧）
-if not track_data.exists and pause_on_silence == 1 then
-    local frozen_time = item_start_ms + track_data.length_ms
-    local frozen_sec = math.max(0, math.min(frozen_time / 1000, video_duration))
-    return video_start + frozen_sec
-end
-
-local elapsed_ms = current_time_ms - item_start_ms
-local elapsed_sec = math.min(math.max(elapsed_ms / 1000, 0), video_duration)
-
-if elapsed_sec <= 0 then
-    return video_start
-end
-
-return video_start + elapsed_sec
-@音高驱动位置
+@闊抽珮椹卞姩浣嶇疆
 --twopoint
 --accelerate
 --decelerate
---param:轨道,0
+--param:杞ㄩ亾,0
 --require:2004300
---label:AutoZYC\音高驱动位置
+--label:AutoZYC\闊抽珮椹卞姩浣嶇疆
 
 local s = obj.getpoint(0)  -- position at min pitch
 local e = obj.getpoint(1)  -- position at max pitch
 
--- 读取轨道设置
+-- 璇诲彇杞ㄩ亾璁剧疆
 local track_param = obj.getpoint("param") or 0
 
--- 使用 State 方法读取轨道数据
+-- 浣跨敤 State 鏂规硶璇诲彇杞ㄩ亾鏁版嵁
 local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" then
     return s
@@ -81,11 +32,11 @@ end
 
 local track_data, active_track = State.find_active_track({}, track_param)
 
--- 间隙：保持上一帧音高位置（必须在 nil 检查前，确保无音符时能回落到上次位置）
+-- 闂撮殭锛氫繚鎸佷笂涓€甯ч煶楂樹綅缃紙蹇呴』鍦?nil 妫€鏌ュ墠锛岀‘淇濇棤闊崇鏃惰兘鍥炶惤鍒颁笂娆′綅缃級
 AutoZYC_PitchLastPos = AutoZYC_PitchLastPos or {}
 local pk = track_param > 0 and track_param or (active_track > 0 and active_track or 1)
 
--- 防护：完全无数据 → 回落到上次位置，无历史则返回起点
+-- 闃叉姢锛氬畬鍏ㄦ棤鏁版嵁 鈫?鍥炶惤鍒颁笂娆′綅缃紝鏃犲巻鍙插垯杩斿洖璧风偣
 if not track_data then
     return AutoZYC_PitchLastPos[pk] or s
 end
@@ -127,26 +78,26 @@ local current_pos = s + (e - s) * t_eased
 AutoZYC_PitchLastPos[pk] = current_pos
 return current_pos
 
-@节奏时间控制
---information:节奏时间控制循环 AutoZYC v2.0
---label:AutoZYC\节奏控制
+@鑺傚鏃堕棿鎺у埗
+--information:鑺傚鏃堕棿鎺у埗寰幆 AutoZYC v2.0
+--label:AutoZYC\鑺傚鎺у埗
 --require:2004300
 --twopoint
 --timecontrol
---param:轨道,0
---param:周期(秒),0
+--param:杞ㄩ亾,0
+--param:鍛ㄦ湡(绉?,0
 
 local obj, math = obj, math;
 
 local s = obj.getpoint(0)
 local e = obj.getpoint(1)
 
--- 读取轨道设置
+-- 璇诲彇杞ㄩ亾璁剧疆
 local track_param, time_len = obj.getpoint("param")
 track_param = track_param or 0
 time_len = time_len or 0
 
--- 使用 State 方法读取轨道数据
+-- 浣跨敤 State 鏂规硶璇诲彇杞ㄩ亾鏁版嵁
 local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
     return s
@@ -154,17 +105,17 @@ end
 
 local track_data = State.find_active_track({}, track_param)
 
--- 防护：完全无数据
+-- 闃叉姢锛氬畬鍏ㄦ棤鏁版嵁
 if not track_data then
     return s
 end
 
 local note_length_sec = track_data.length_ms / 1000
 if note_length_sec <= 0 then
-    return e  -- 间隙：停在目标点
+    return e  -- 闂撮殭锛氬仠鍦ㄧ洰鏍囩偣
 end
 
--- 计算有效周期
+-- 璁＄畻鏈夋晥鍛ㄦ湡
 local effective_period
 if time_len > 0 then
     effective_period = time_len
@@ -177,39 +128,39 @@ if effective_period <= 0 then
     return s
 end
 
--- 计算经过时间
+-- 璁＄畻缁忚繃鏃堕棿
 local note_start_sec = track_data.position_ms / 1000
 local elapsed_in_note = State.get_audio_time() - note_start_sec
 
--- 相位：到达目标后停止
+-- 鐩镐綅锛氬埌杈剧洰鏍囧悗鍋滄
 elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
 local phase = math.min(elapsed_in_note / effective_period, 1.0)
 
--- 评估时间控制曲线 (映射到物件全长)
+-- 璇勪及鏃堕棿鎺у埗鏇茬嚎 (鏄犲皠鍒扮墿浠跺叏闀?
 local object_duration = obj.getpoint("time", 1)
 local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
 return s + (e - s) * curve_t
 
-@节奏时间控制往复
---information:节奏时间控制循环往复 AutoZYC v2.0
---label:AutoZYC\节奏控制
+@鑺傚鏃堕棿鎺у埗寰€澶?
+--information:鑺傚鏃堕棿鎺у埗寰幆寰€澶?AutoZYC v2.0
+--label:AutoZYC\鑺傚鎺у埗
 --require:2004300
 --twopoint
 --timecontrol
---param:轨道,0
---param:周期(秒),0
+--param:杞ㄩ亾,0
+--param:鍛ㄦ湡(绉?,0
 
 local obj, math = obj, math;
 
 local s = obj.getpoint(0)
 local e = obj.getpoint(1)
 
--- 读取轨道设置
+-- 璇诲彇杞ㄩ亾璁剧疆
 local track_param, time_len = obj.getpoint("param")
 track_param = track_param or 0
 time_len = time_len or 0
 
--- 使用 State 方法读取轨道数据
+-- 浣跨敤 State 鏂规硶璇诲彇杞ㄩ亾鏁版嵁
 local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
     return s
@@ -217,7 +168,7 @@ end
 
 local track_data = State.find_active_track({}, track_param)
 
--- 防护：完全无数据
+-- 闃叉姢锛氬畬鍏ㄦ棤鏁版嵁
 if not track_data then
     return s
 end
@@ -228,7 +179,7 @@ if note_length_sec <= 0 then
     if ni % 2 == 0 then return s else return e end
 end
 
--- 计算有效周期
+-- 璁＄畻鏈夋晥鍛ㄦ湡
 local effective_period
 if time_len > 0 then
     effective_period = time_len
@@ -241,46 +192,46 @@ if effective_period <= 0 then
     return s
 end
 
--- 计算经过时间
+-- 璁＄畻缁忚繃鏃堕棿
 local note_start_sec = track_data.position_ms / 1000
 local elapsed_in_note = State.get_audio_time() - note_start_sec
 
--- 相位：到达目标后停止
+-- 鐩镐綅锛氬埌杈剧洰鏍囧悗鍋滄
 elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
 local phase = math.min(elapsed_in_note / effective_period, 1.0)
 
--- 往復模式：按音符序号切换方向 (类@常用效果 镜像反转)
+-- 寰€寰╂ā寮忥細鎸夐煶绗﹀簭鍙峰垏鎹㈡柟鍚?(绫籃甯哥敤鏁堟灉 闀滃儚鍙嶈浆)
 local v0, v1 = s, e
 local note_index = track_data.count or 0
 if note_index % 2 == 0 then
     v0, v1 = e, s
 end
 
--- 评估时间控制曲线 (映射到物件全长)
+-- 璇勪及鏃堕棿鎺у埗鏇茬嚎 (鏄犲皠鍒扮墿浠跺叏闀?
 local object_duration = obj.getpoint("time", 1)
 local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
 return v0 + (v1 - v0) * curve_t
 
-@节奏时间控制镜像往复
---information:节奏时间控制镜像往复 AutoZYC v2.0
---label:AutoZYC\节奏控制
+@鑺傚鏃堕棿鎺у埗闀滃儚寰€澶?
+--information:鑺傚鏃堕棿鎺у埗闀滃儚寰€澶?AutoZYC v2.0
+--label:AutoZYC\鑺傚鎺у埗
 --require:2004300
 --twopoint
 --timecontrol
---param:轨道,0
---param:周期(秒),0
+--param:杞ㄩ亾,0
+--param:鍛ㄦ湡(绉?,0
 
 local obj, math = obj, math;
 
 local s = obj.getpoint(0)
 local e = obj.getpoint(1)
 
--- 读取轨道设置
+-- 璇诲彇杞ㄩ亾璁剧疆
 local track_param, time_len = obj.getpoint("param")
 track_param = track_param or 0
 time_len = time_len or 0
 
--- 使用 State 方法读取轨道数据
+-- 浣跨敤 State 鏂规硶璇诲彇杞ㄩ亾鏁版嵁
 local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
     return s
@@ -288,17 +239,17 @@ end
 
 local track_data = State.find_active_track({}, track_param)
 
--- 防护：完全无数据
+-- 闃叉姢锛氬畬鍏ㄦ棤鏁版嵁
 if not track_data then
     return s
 end
 
 local note_length_sec = track_data.length_ms / 1000
 if note_length_sec <= 0 then
-    return e  -- 镜像往复 gap：停到 e
+    return e  -- 闀滃儚寰€澶?gap锛氬仠鍒?e
 end
 
--- 计算有效周期
+-- 璁＄畻鏈夋晥鍛ㄦ湡
 local effective_period
 if time_len > 0 then
     effective_period = time_len
@@ -311,15 +262,15 @@ if effective_period <= 0 then
     return s
 end
 
--- 计算经过时间
+-- 璁＄畻缁忚繃鏃堕棿
 local note_start_sec = track_data.position_ms / 1000
 local elapsed_in_note = State.get_audio_time() - note_start_sec
 
--- 相位：到达目标后停止
+-- 鐩镐綅锛氬埌杈剧洰鏍囧悗鍋滄
 elapsed_in_note = math.min(elapsed_in_note, note_length_sec)
 local phase = math.min(elapsed_in_note / effective_period, 1.0)
 
--- 镜像往復模式：按音符序号切换方向
+-- 闀滃儚寰€寰╂ā寮忥細鎸夐煶绗﹀簭鍙峰垏鎹㈡柟鍚?
 local v0, v1 = s, e
 local note_index = track_data.count or 0
 if note_index % 2 == 0 then
@@ -327,8 +278,9 @@ if note_index % 2 == 0 then
     v1 = e
 end
 
--- 评估时间控制曲线 (映射到物件全长)
+-- 璇勪及鏃堕棿鎺у埗鏇茬嚎 (鏄犲皠鍒扮墿浠跺叏闀?
 local object_duration = obj.getpoint("time", 1)
 local curve_t = obj.getpoint("timecontrol", "value", phase * object_duration)
 return v0 + (v1 - v0) * curve_t
+
 
