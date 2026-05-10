@@ -4,7 +4,6 @@
 
 
 @视频播放控制
---file@video_file:视频文件
 --value@track:指定轨道,0
 --value@video_offset:视频偏移(秒),0
 --value@playback_speed:播放速度,1
@@ -17,7 +16,6 @@ local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
     return
 end
-if not video_file or video_file == "" then return end
 
 local track_param = track or 0
 local video_offset = video_offset or 0
@@ -38,7 +36,7 @@ end
 
 -- 视频时间 = 视频偏移 + (音频时间 - 音符起点 - 卡点偏移) × 播放速度
 local video_time = video_offset + (audio_time_sec - note_start_sec - timing_offset) * playback_speed
-obj.load("movie", video_file, math.max(0, video_time))
+obj.load("movie", nil, math.max(0, video_time))
 
 @常用效果
 --value@track:指定轨道,0
