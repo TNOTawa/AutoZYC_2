@@ -14,10 +14,10 @@
 @视频播放控制
 --twopoint
 --param:轨道,0
---value@video_offset:视频偏移(秒),0
---value@playback_speed:播放速度,1
---value@timing_offset:卡点偏移(秒),0
---check@pause_on_silence:在音符停止时停止播放,0
+--param:视频偏移(秒),0
+--param:播放速度,1
+--param:卡点偏移(秒),0
+--param:在音符停止时停止播放,0,1,0
 --require:2004300
 --label:AutoZYC\视频播放控制
 
@@ -26,11 +26,12 @@ local video_start = obj.getpoint(0)
 local video_end   = obj.getpoint(1)
 local video_duration = video_end - video_start
 
-local track_param = obj.getpoint("param") or 0
-local video_offset = video_offset or 0
-local playback_speed = playback_speed or 1
-local timing_offset = timing_offset or 0
-local pause_on_silence = pause_on_silence or 0
+local track_param, video_offset, playback_speed, timing_offset, pause_on_silence = obj.getpoint("param")
+track_param = track_param or 0
+video_offset = video_offset or 0
+playback_speed = playback_speed or 1
+timing_offset = timing_offset or 0
+pause_on_silence = pause_on_silence or 0
 
 local State = AutoZYC_State or {}
 if type(State.find_active_track) ~= "function" or type(State.get_audio_time) ~= "function" then
