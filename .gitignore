@@ -10,6 +10,7 @@ aviutl2_sdk/
 *.o
 *.obj
 *.exe
+*.mod2
 
 # Temp
 _pkg_tmp/

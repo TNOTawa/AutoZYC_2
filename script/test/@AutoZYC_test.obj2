@@ -422,12 +422,31 @@ else
     debug_print("[e2e_state] FAIL: State.add_event/get_events, count=" .. tostring(evts and #evts or "nil"))
 end
 
--- Test 4: AutoZYC_Item_count backward compat
-AutoZYC_Item_count = AutoZYC_Item_count or {}
-AutoZYC_Item_count[1] = {count = 1, exists = true, position_ms = 1000, length_ms = 500, pitch_shift = 0, velocity = 100}
-debug_print("[e2e_state] PASS: AutoZYC_Item_count[1] set")
+-- Test 4: State.add_event + update + get_active_info (inside event window)
+pcall(AutoZYC_State.reset)
+AutoZYC_State.add_event(1, {
+    position_sec = 2.0, length_sec = 1.0,
+    position_ms = 2000, length_ms = 1000,
+    pitch_shift = 2.0, velocity = 100,
+    track = 1, event_type = "test"
+})
+AutoZYC_State.update(2.3)
+local ok4, active = pcall(function() return AutoZYC_State.get_active_info(1, 2.3) end)
+if ok4 and active and active.exists and active.count == 1 then
+    debug_print("[e2e_state] PASS: State.get_active_info inside event -> count=" .. active.count .. ", pitch=" .. active.pitch_shift)
+else
+    debug_print("[e2e_state] FAIL: State.get_active_info inside event expected exists=true, got " .. tostring(active and active.exists))
+end
 
--- Test 5: Ease table accessible
+-- Test 5: State.get_active_info outside event window
+local ok5, inactive = pcall(function() return AutoZYC_State.get_active_info(1, 5.0) end)
+if ok5 and inactive and not inactive.exists then
+    debug_print("[e2e_state] PASS: State.get_active_info outside event -> exists=false")
+else
+    debug_print("[e2e_state] FAIL: State.get_active_info outside event expected exists=false")
+end
+
+-- Test 6: Ease table accessible
 if type(Ease) == "table" then
     local has_select = type(Ease.select) == "function"
     debug_print("[e2e_state] " .. (has_select and "PASS" or "FAIL") .. ": Ease table accessible, select=" .. tostring(has_select))

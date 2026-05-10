@@ -1,14 +1,14 @@
 -- ============================================================
--- AutoZYC v2.0 - 鏍稿績鍩虹璁炬柦
--- 鎵€鏈塻ection閫氳繃鍏ㄥ眬 AutoZYC_State 琛ㄩ€氫俊
--- 鏃犲叡浜玴reamble鍙墽琛屼唬鐮?- 姣弒ection瀹屽叏鑷寘鍚?
+-- AutoZYC v2.0 - 核心基础设施
+-- 所有section通过全局 AutoZYC_State 表通信
+-- 无共享preamble可执行代码 - 每section完全自包含
 -- ============================================================
 
-@鏁版嵁瀵煎叆
---file@data_file:鏁版嵁鏂囦欢(RPP/MIDI)
---select@file_type:鏂囦欢绫诲瀷,鑷姩妫€娴?0,RPP鏂囦欢=1,MIDI鏂囦欢=2
+@数据导入
+--file@data_file:数据文件(RPP/MIDI)
+--select@file_type:文件类型,自动检测=0,RPP文件=1,MIDI文件=2
 --require:2004300
---label:AutoZYC\鏁版嵁瀵煎叆
+--label:AutoZYC\数据导入
 
 local obj, math, tonumber, type, ipairs, pairs, table, debug_print =
     obj, math, tonumber, type, ipairs, pairs, table, debug_print;
@@ -110,10 +110,10 @@ function State.load_from_mod2(mod, event_type)
     end
 end
 
--- 鑾峰彇鎸囧畾杞ㄩ亾鐨勫綋鍓嶆椿鍔ㄧ墿浠朵俊鎭?
--- track: 杞ㄩ亾缂栧彿 (1-based)
--- time: 褰撳墠鏃堕棿锛堢锛?
--- 杩斿洖: {count, exists, position_ms, remaining_ms, length_ms, pitch_shift, velocity}
+-- 获取指定轨道的当前活动物件信息
+-- track: 轨道编号 (1-based)
+-- time: 当前时间（秒）
+-- 返回: {count, exists, position_ms, remaining_ms, length_ms, pitch_shift, velocity}
 function State.get_active_info(track, time)
     local mod = State._mod
     if type(mod) ~= "table" or type(mod.get_current_item) ~= "function" then
@@ -141,15 +141,15 @@ function State.get_active_info(track, time)
     }
 end
 
--- 杩斿洖褰撳墠鍏ㄥ眬闊抽鏃堕棿锛堢锛?
+-- 返回当前全局音频时间（秒）
 function State.get_audio_time()
     return State.global_time or 0
 end
 
--- 鏌ユ壘褰撳墠婵€娲荤殑杞ㄩ亾鏁版嵁
--- counter_data: 杞ㄩ亾鏁版嵁琛?
--- track_param: 0鎴杗il鏃惰嚜鍔ㄦ煡鎵剧涓€涓椿璺冭建閬? >0鏃剁洿鎺ョ储寮?
--- 杩斿洖: track_data, track_number
+-- 查找当前激活的轨道数据
+-- counter_data: 轨道数据表
+-- track_param: 0或nil时自动查找第一个活跃轨道; >0时直接索引
+-- 返回: track_data, track_number
 function State.find_active_track(counter_data, track_param)
     -- Handle {} sentinel: build per-track summaries from State.events via C++ binary search
     if type(counter_data) == "table" and not next(counter_data) then
@@ -181,39 +181,39 @@ function State.find_active_track(counter_data, track_param)
 end
 
 -- ============================================================
--- 缂撳姩鍑芥暟搴?(Ease table)
--- 浠?AutoZYC.tra2 鍓嶅杩佺Щ鑷虫锛岀‘淇濆叏灞€鍙敤
+-- 缓动函数库 (Ease table)
+-- 从 AutoZYC.tra2 前导迁移至此，确保全局可用
 -- ============================================================
 Ease = {}
 
--- 1. 绾挎€?
+-- 1. 线性
 function Ease.linear(t) return t end
 
--- 2. 缂撳叆浜屾
+-- 2. 缓入二次
 function Ease.easeInQuad(t) return t * t end
 
--- 3. 缂撳嚭浜屾
+-- 3. 缓出二次
 function Ease.easeOutQuad(t) return 1 - (1 - t) * (1 - t) end
 
--- 4. 缂撳叆缂撳嚭浜屾
+-- 4. 缓入缓出二次
 function Ease.easeInOutQuad(t)
     if t < 0.5 then return 2 * t * t
     else return 1 - 2 * (1 - t) * (1 - t) end
 end
 
--- 5. 缂撳叆涓夋
+-- 5. 缓入三次
 function Ease.easeInCubic(t) return t * t * t end
 
--- 6. 缂撳嚭涓夋
+-- 6. 缓出三次
 function Ease.easeOutCubic(t) return 1 - (1 - t) ^ 3 end
 
--- 7. 缂撳叆缂撳嚭涓夋
+-- 7. 缓入缓出三次
 function Ease.easeInOutCubic(t)
     if t < 0.5 then return 4 * t * t * t
     else return 1 - (-2 * t + 2) ^ 3 / 2 end
 end
 
--- 8. 缂撳嚭寮硅烦
+-- 8. 缓出弹跳
 function Ease.easeOutBounce(t)
     local n1 = 7.5625
     local d1 = 2.75
@@ -231,21 +231,21 @@ function Ease.easeOutBounce(t)
     end
 end
 
--- 9. 缂撳嚭鍥為€€
+-- 9. 缓出回退
 function Ease.easeOutBack(t)
     local c1 = 1.70158
     local c3 = c1 + 1
     return 1 + c3 * (t - 1) ^ 3 + c1 * (t - 1) ^ 2
 end
 
--- 10. 缂撳嚭寮规€?
+-- 10. 缓出弹性
 function Ease.easeOutElastic(t)
     if t == 0 or t == 1 then return t end
     local c4 = 2 * math.pi / 3
     return 2 ^ (-10 * t) * math.sin((t * 10 - 0.75) * c4) + 1
 end
 
--- 缂撳姩鍑芥暟閫夋嫨鍣?
+-- 缓动函数选择器
 function Ease.select(acc, dec)
     if acc and dec then
         return Ease.easeInOutQuad
@@ -266,7 +266,7 @@ function init()
         local mod = obj.module("AutoZYCParse")
         local ok, err = pcall(mod.parse_file, data_file)
         if not ok then
-            debug_print("[鏁版嵁瀵煎叆] 澶辫触: " .. tostring(err))
+            debug_print("[数据导入] 失败: " .. tostring(err))
             return
         end
         local ext = data_file:lower()
@@ -282,7 +282,7 @@ function init()
         end
         local total = 0
         for _, items in pairs(State.events) do total = total + #items end
-        debug_print("[鏁版嵁瀵煎叆] 瀹屾垚: " .. total .. " 浜嬩欢, 绫诲瀷=" .. event_type)
+        debug_print("[数据导入] 完成: " .. total .. " 事件, 类型=" .. event_type)
     end
     State.global_time = obj.time  -- Update global time each frame (no per-frame scan)
 end

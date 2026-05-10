@@ -9,7 +9,7 @@ AutoZYC is a hybrid LuaJIT + C++ plugin for Aviutl2 that automates otomad video 
 ```
 .
 ├── script/
-│   ├── @AutoZYC.obj2              # data import, counter, generator, ease settings
+│   ├── @AutoZYC.obj2              # data import, generator, ease settings
 │   ├── @AutoZYC.tra2              # 10 easing functions + 6 easing sections
 │   ├── @AutoZYC.anm2              # 4-mode flip + 2 pixel shaders
 │   └── test/@AutoZYC_test.obj2    # E2E tests
@@ -42,12 +42,10 @@ Plugin layer (.aux2 C++):         Independent DLL — object generation, menus, 
 
 | Task | File | Section |
 |------|------|---------|
-| Data import | script/@AutoZYC.obj2 | @数据导入 |
-| Object counter | script/@AutoZYC.obj2 | @物件计数器 |
+| Data import & State methods | script/@AutoZYC.obj2 | @数据导入 |
 | Object generator | script/@AutoZYC.obj2 | @物件生成器 |
-| Ease settings | script/@AutoZYC.obj2 | @缓动设置 |
-| Easing library | script/@AutoZYC.tra2 | preamble (Ease table) |
-| Linear/video/pitch/velocity/BPM/expression | script/@AutoZYC.tra2 | @线性/@视频/@音高/@力度/@BPM/@表达式 |
+| Easing library | script/@AutoZYC.obj2 | @数据导入 (Ease table) |
+| Video playback / pitch position / rhythm sections | script/@AutoZYC.tra2 | @视频播放控制/@音高驱动位置/@节奏时间控制/@节奏时间控制往复/@节奏时间控制镜像往复/@音高驱动位置时间控制 |
 | Mirror flip + alpha | script/@AutoZYC.anm2 | @常用效果 |
 | Pixel shaders | script/@AutoZYC.anm2 | @色相映射, @亮度映射 |
 | .mod2 source | native/AutoZYCParse/AutoZYCParse.cpp | C++17 |
@@ -64,6 +62,7 @@ mod.get_track_count()                                   -- -> int
 mod.get_event_count(track)                              -- -> int
 mod.get_event_data(track)                               -- -> {pos,len,pitch,vel,...} flat array
 mod.get_track_meta(track)                               -- -> {min_pitch, max_pitch, item_count}
+mod.get_current_item(track, time_sec)                   -- -> {count, is_playing, position_sec, length_sec, pitch_shift, velocity}
 mod.eval_expression(expr, pitch, vel, time, idx, track) -- -> double
 ```
 
@@ -72,11 +71,8 @@ mod.eval_expression(expr, pitch, vel, time, idx, track) -- -> double
 | Global Variable | Source | Consumers |
 |-----------------|--------|-----------|
 | AutoZYC_State | obj2 (@数据导入) | All sections |
-| AutoZYC_Item_count | obj2 (@物件计数器) | tra2, anm2 |
-| AutoZYC_EaseSettings | obj2 (@缓动设置) | tra2 |
 | AutoZYC_PitchRange | obj2 (@数据导入) | tra2 (@音高驱动位置) |
-| AutoZYC_GlobalAudioTime | obj2 (@物件计数器) | tra2 |
-| Ease | tra2 (preamble) | All easing sections |
+| Ease | obj2 (@数据导入) | All easing sections |
 
 ## CRITICAL CONVENTIONS
 
