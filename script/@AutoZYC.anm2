@@ -36,7 +36,7 @@ end
 
 -- 视频时间 = 视频偏移 + (音频时间 - 音符起点 - 卡点偏移) × 播放速度
 local video_time = video_offset + (audio_time_sec - note_start_sec - timing_offset) * playback_speed
-obj.load("movie", nil, math.max(0, video_time))
+obj.effect("動画ファイル", "再生位置", math.max(0, video_time))
 
 @常用效果
 --value@track:指定轨道,0
