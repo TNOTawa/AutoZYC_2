@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- AutoZYC v2.0 - 视觉效果与着色器
 -- ============================================================
 
@@ -15,11 +15,18 @@ local track = track or 0
 
 local item_data = nil
 local item_count = 0
-if type(State.get_active_info) == "function" then
+if type(State.find_active_track) == "function" then
+    -- Use find_active_track with note-relative timing (syncs with @节奏时间控制)
+    item_data = State.find_active_track({}, track)
+    if item_data then
+        item_count = item_data.count or 0
+    end
+elseif type(State.get_active_info) == "function" then
+    -- Fallback: absolute time query
     item_data = State.get_active_info(track, obj.time)
     item_count = item_data and item_data.count or 0
 else
-    -- Fallback for backward compatibility
+    -- Last resort fallback
     item_data = (AutoZYC_Item_count or {})[track]
     item_count = item_data and item_data.count or 0
 end
