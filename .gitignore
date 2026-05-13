@@ -11,6 +11,7 @@ aviutl2_sdk/
 *.obj
 *.exe
 *.mod2
+*.au2pkg.zip
 
 # Temp
 _pkg_tmp/
