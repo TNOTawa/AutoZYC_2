@@ -1,4 +1,4 @@
-# SDK and references (read-only)
+﻿# SDK and references (read-only)
 references/
 aviutl2_sdk/
 
@@ -7,15 +7,19 @@ aviutl2_sdk/
 .swarm/
 
 # Build artifacts
+build/
+build_old/
 *.o
 *.obj
 *.exe
 *.mod2
+*.aux2
 *.au2pkg.zip
 
 # Temp
 _pkg_tmp/
 dist_tmp/
+dist/_verify_temp/
 
 # IDE
 .vs/
