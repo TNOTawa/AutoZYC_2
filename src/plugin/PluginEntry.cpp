@@ -21,7 +21,7 @@ static GenerationConfig g_genConfig;
 // Plugin identification table — returned by GetCommonPluginTable()
 // ---------------------------------------------------------------------------
 static COMMON_PLUGIN_TABLE g_pluginTable = {
-    L"AutoZYC v3.0",
+    L"AutoZYC v2.0",
     L"\x97F3MAD\x81EA\x52A8\x7269\x4EF6\x751F\x6210\x63D2\x4EF6",
 };
 
@@ -224,7 +224,7 @@ extern "C" __declspec(dllexport) void RegisterPlugin(HOST_APP_TABLE* host)
 
     // Plugin information shown in host UI
     host->set_plugin_information(
-        L"\x97F3MAD\x81EA\x52A8\x7269\x4EF6\x751F\x6210\x63D2\x4EF6 - AutoZYC v3.0"
+        L"\x97F3MAD\x81EA\x52A8\x7269\x4EF6\x751F\x6210\x63D2\x4EF6 - AutoZYC v2.0"
     );
 
     // --- Register menus ---

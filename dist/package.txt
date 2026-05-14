@@ -1,6 +1,6 @@
-﻿AutoZYC v3.0 Installation
+﻿AutoZYC v2.0 Installation
 ==========================
-1. Drag AutoZYC-v3.0.0.au2pkg.zip onto the Aviutl2 window
+1. Drag AutoZYC-v2.0.0.au2pkg.zip onto the Aviutl2 window
    OR
 2. Extract manually to Aviutl2 installation directory:
    Script/AutoZYC/@AutoZYC.anm2
@@ -12,7 +12,7 @@ Requirements:
 - For RPP files: REAPER project files
 - For MIDI files: Standard MIDI Files (SMF) format 0 or 1
 
-Architecture (v3.0):
+Architecture (v2.0):
 - AutoZYC.aux2 (C++ plugin): Object generation, RPP/MIDI parsing, expression evaluation, config persistence
 - @AutoZYC.anm2 (Lua): Mirror flip, alpha, pixel shaders (hue/brightness mapping)
 - @AutoZYC.tra2 (Lua): Video playback, pitch-driven position, rhythm timing, easing functions

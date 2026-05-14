@@ -9,6 +9,7 @@ aviutl2_sdk/
 # Build artifacts
 build/
 build_old/
+dist/
 *.o
 *.obj
 *.exe
