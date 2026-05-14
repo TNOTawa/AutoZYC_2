@@ -1,5 +1,5 @@
 ﻿cmake_minimum_required(VERSION 3.20)
-project(AutoZYC VERSION 3.0.0 LANGUAGES CXX)
+project(AutoZYC VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,11 @@ target_link_libraries(AutoZYC PRIVATE -lcomdlg32)
 set_target_properties(AutoZYC PROPERTIES
     SUFFIX ".aux2"
     PREFIX ""
+)
+
+# Dev logging on Debug builds
+target_compile_definitions(AutoZYC PRIVATE
+    $<$<CONFIG:Debug>:AUTOZYC_DEV_LOG=1>
 )
 
 enable_testing()
