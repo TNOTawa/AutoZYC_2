@@ -1,4 +1,4 @@
-﻿// AutoZYC.aux2 — 工程设置对话框（Win32 实现）
+// AutoZYC.aux2 — 工程设置对话框（Win32 实现）
 #include "src/ui/SettingsDialog.h"
 #include "src/core/Logger.h"
 #include <commctrl.h>

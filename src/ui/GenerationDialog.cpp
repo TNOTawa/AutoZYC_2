@@ -1,4 +1,4 @@
-﻿// AutoZYC.aux2 — 序列物件生成对话框（Win32 实现）
+// AutoZYC.aux2 — 序列物件生成对话框（Win32 实现）
 #include "src/ui/GenerationDialog.h"
 #include <commctrl.h>
 #include <cstdio>
