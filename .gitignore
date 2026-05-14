@@ -1,12 +1,14 @@
-# SDK and references (read-only)
+﻿# SDK and references (read-only)
 references/
 aviutl2_sdk/
 
 # Internal state
 .sisyphus/
 .swarm/
+.kilo/
 
 # Build artifacts
+dist/
 *.o
 *.obj
 *.exe
