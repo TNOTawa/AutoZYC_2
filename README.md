@@ -1,5 +1,11 @@
 # AutoZYC
 
+本项目已归档，功能将于未来合并进 [Autozwj](https://github.com/TNOTawa/AutoZWJ)
+
+以下为原项目的 README.md
+
+---
+
 Aviutl2 音MAD自动对轨插件。
 
 ## 版本状态
